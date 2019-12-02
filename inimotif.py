@@ -26,14 +26,27 @@ class KmerCounter:
     """
     def __init__(self, k, revcom_flag=True, unique_kmer_in_seq_mode=True):
         assert k>0, "kmer length should be greater than 0"
-        assert k<16, "kmer should be shorter than 16 bases"
+        assert k<32, "kmer should be shorter than 32 bases"
+        
+        if k<16:
+            self.dtype = np.uint32
+        elif k<32:
+            self.dtype = np.uint64
+        else:
+            print("kmer should be shorter than 32 bases")
+            raise ValueError
+        
         self.k = k
         self.revcom_flag = revcom_flag
         self.unique_kmer_in_seq_mode = unique_kmer_in_seq_mode
         
-        self.base = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
+        base_map = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
+        self.base = {bk:self.dtype(base_map[bk]) for bk in base_map}
         self.revcom_dict = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N'}
+        
         self.mask = self.gen_hash_mask(k)
+        self.twobit_mask = self.dtype(3) # 0b11
+        
         self.kmer_dict = {}
         self.top_kmers_list = None
         
@@ -42,38 +55,36 @@ class KmerCounter:
     
     # generate a hash mask for kmers such that bits out of scope can be masked to 0
     def gen_hash_mask(self,k):
-        assert k<16, "kmer should be shorter than 16 bases"
-#        mask = np.ones(1,dtype='uint32')
-        mask = np.uint32((1<<2*k)-1)
+        assert k<32, "kmer should be shorter than 32 bases"
+        mask = self.dtype((1<<2*k)-1)
         return mask
     
     def kmer2hash(self, kmer):
         """
         kmer: input sequence
-        return: a hash code, 32 bit
+        return: a hash code
         """
         k = self.k
         assert self.k == len(kmer)
-        assert k<16, "kmer should be shorted than 16 bases"
-        kh = np.zeros(1,dtype='uint32')
+        assert k<32, "kmer should be shorted than 32 bases"
         kh = self.base[kmer[0]]
         for tb in kmer[1:]:
-            kh = kh<<2
+            kh = kh<<self.dtype(2)
             kh += self.base[tb]
         return kh
 
     def hash2kmer(self, hashkey):
         """
-        hashkey: hash key of kmer, numpy, 'uint32'
+        hashkey: hash key of kmer, numpy
         k: length of kmer
         """
         k = self.k
         base = np.array('ACGT', 'c')
         arr = np.chararray(k)
-        mask = 0b11
+        mask = self.twobit_mask
         arr[-1]=base[ mask & hashkey]
         for i in range(2,k+1):
-            hashkey = (hashkey>>2)
+            hashkey = (hashkey>>self.dtype(2))
             arr[-i]=base[mask & hashkey]
         return arr.tostring().decode("utf-8")
     
@@ -86,11 +97,11 @@ class KmerCounter:
     def revcom_hash(self, in_hash):
         com_hash = self.mask - in_hash  # complement hash
         # reverse
-        ret_hash = 0b11 & com_hash
+        ret_hash = self.twobit_mask & com_hash
         for i in range(self.k-1):
-            ret_hash = ret_hash<<2
-            com_hash = com_hash>>2
-            ret_hash += 0b11 & com_hash
+            ret_hash = ret_hash<<self.dtype(2)
+            com_hash = com_hash>>self.dtype(2)
+            ret_hash += self.twobit_mask & com_hash
         return ret_hash
     
     # scan kmers in a sequence
@@ -100,19 +111,19 @@ class KmerCounter:
         res_dict = {}
         k = self.k
         i=0
-        prev_hash = -1
+        prev_hash = self.dtype(-1)
         while(i<=len_str-k):
             tmpstr = in_str[i:i+k]
             # omit a kmer if it contains "N"
             if "N" in tmpstr:
                 i += 1 + max([pos for pos, char in enumerate(tmpstr) if char == 'N'])
-                prev_hash = -1
+                prev_hash = self.dtype(-1)
                 continue
-            if prev_hash<0:
+            if prev_hash==self.dtype(-1):
                 tmphash = self.kmer2hash(tmpstr)
             # reuse hash in previous position
             else:         
-                tmphash = (prev_hash<<2) & self.mask
+                tmphash = (prev_hash<<self.dtype(2)) & self.mask
                 tmphash += self.base[ in_str[i+k-1] ]
             prev_hash = tmphash
             res_dict[tmphash] = res_dict.get(tmphash,0)+1
@@ -153,7 +164,7 @@ class KmerCounter:
         
         def gen_res(res):
             kmer_hash_list = tuple( (x[0], self.kmer_dict[x[0]] ) for x in res )
-            revcom_hash_list = tuple( (self.revcom_hash(x[0]), self.kmer_dict[self.revcom_hash(x[0])] ) for x in res )
+            revcom_hash_list = tuple( (self.revcom_hash(x[0]), self.kmer_dict.get(self.revcom_hash(x[0]), 0) ) for x in res )
             return kmer_hash_list, revcom_hash_list
         
         tmp_counter = Counter(self.kmer_dict)
@@ -215,12 +226,12 @@ class KmerCounter:
     # get the hamming ball
     def get_hamming_ball(self, kmer_hash, n_max_mutation=2) -> Set:
         def mutate(kmer_hash, pos):
-            tmpmask = self.mask - self.mask
+            tmpmask = self.dtype(0)
             base_list = []
             for p in pos:
-                tmpmask += (0b11<<2*p)
-                base_list.append(0b11 & (kmer_hash>>2*p))
-            tmpbase = type(self.mask)((~tmpmask) & self.mask & kmer_hash)
+                tmpmask += (self.twobit_mask << self.dtype(2*p) )
+                base_list.append(self.twobit_mask & (kmer_hash>> self.dtype(2*p) ))
+            tmpbase = self.dtype((~tmpmask) & self.mask & kmer_hash)
             
             def my_gen(m):
                 return [i for i in range(4) if i!=m]
@@ -228,7 +239,7 @@ class KmerCounter:
             for e in product(*[my_gen(b) for b in base_list]):
                 tmphash = tmpbase
                 for i,p in enumerate(pos):
-                    tmphash += (e[i]<<2*p) 
+                    tmphash += (e[i]<< self.dtype(2*p) ) 
                 yield type(self.mask)(tmphash) # also works for pos=()
         
         res_set = set()
@@ -337,7 +348,7 @@ class MotifManager:
         mat = np.zeros(shape=(4, k), dtype="int")   # 4 x k matrix
         for kh, kc in zip(kmerhash_arr,cnt_arr):
             for i in range(k):
-                tmpbase = (kh>>2*i) & 0b11
+                tmpbase = (kh>>self.kmer_counter.dtype(2*i)) & self.kmer_counter.twobit_mask
                 mat[tmpbase, i] += kc
         return mat
     
@@ -352,13 +363,13 @@ class MotifManager:
             return revcom_val+val
     
     def get_pair_cntarr(self, kmer_arr):
-        cnt_arr = np.zeros(len(kmer_arr),dtype='uint32')
+        cnt_arr = np.zeros(len(kmer_arr),dtype='int')
         for i,kh in enumerate(kmer_arr):
             cnt_arr[i] = self.get_pair_cnt(kh)
         return cnt_arr
     
     def get_kmers_cntarr(self, kmer_arr):
-        cnt_arr = np.zeros(len(kmer_arr),dtype='uint32')
+        cnt_arr = np.zeros(len(kmer_arr),dtype='int')
         for i,kh in enumerate(kmer_arr):
             cnt_arr[i] = self.kmer_dict.get(kh,0)
         return cnt_arr
@@ -371,19 +382,19 @@ class MotifManager:
         
         res_list = []
         i=0
-        prev_hash = -1
+        prev_hash = self.kmer_counter.dtype(-1)
         while(i<=len_str-k):
             tmpstr = in_str[i:i+k]
             # omit a kmer if it contains "N"
             if "N" in tmpstr:
                 i += 1 + max([pos for pos,char in enumerate(tmpstr) if char == 'N'])
-                prev_hash = -1
+                prev_hash = self.kmer_counter.dtype(-1)
                 continue
-            if prev_hash<0:
+            if prev_hash==self.kmer_counter.dtype(-1):
                 tmphash = self.kmer_counter.kmer2hash(tmpstr)
             # reuse hash in previous position
             else:         
-                tmphash = (prev_hash<<2) & self.kmer_counter.mask
+                tmphash = (prev_hash<< self.kmer_counter.dtype(2) ) & self.kmer_counter.mask
                 tmphash += self.kmer_counter.base[ in_str[i+k-1] ]
             prev_hash = tmphash
             if tmphash in hamming_ball:
@@ -441,6 +452,10 @@ class MotifManager:
     def mk_bubble_plot(self) -> None:
         tfbs_arr = np.vstack((self.n_tfbs_forward_arr, self.n_tfbs_revcom_arr))
         uniq_pairs,uniq_cnt = np.unique(tfbs_arr, axis=1, return_counts=True)
+        # do not display non motif sequences for better visualization
+        if uniq_pairs[0,0]==0 and uniq_pairs[1,0]==0:
+            uniq_pairs = uniq_pairs[:,1:]
+            uniq_cnt = uniq_cnt[1:]
         plt.scatter(uniq_pairs[0,], uniq_pairs[1,], s=uniq_cnt)
         perc = round(self.n_tfbs_seq/self.n_seq*100,1)
         plt.title(f'{self.n_tfbs_seq} out of {self.n_seq} ({perc}%) sequences contain TFBS')
@@ -592,16 +607,16 @@ class FileProcessor:
 if __name__=="__main__":
     
     # in_file = sys.argv[1]
-    in_file = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1"
+#    in_file = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/VR_AR_hg19.fasta"
-#    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/VR_AR_hg19.fasta.gz"
+    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/VR_ERG_hg19.fasta.gz"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/masked_VR_AR_hg19.fasta"
     
-#    fp = FileProcessor(in_file, out_dir="./test", kmer_len=6)
+    fp = FileProcessor(in_file, out_dir="./test", kmer_len=12)
     
-#    kc6 = KmerCounter(6)
+#    kc6 = KmerCounter(18)
 #    kc6.scan_file(in_file)
-#    
+    
 #    top_kmer_res = kc6.get_top_kmers()
 #    consensus = kc6.get_consensus()
 #    
@@ -630,13 +645,13 @@ if __name__=="__main__":
 #        print(kc6.hash2kmer(kh))
         
     
-    file_arr = ['VR-AR_VR-ERG_complete.fasta.gz',
-                'VR-FA1_VR-HB13_complete.fasta.gz',
-                'VR_AR_hg19.fasta.gz',
-                'VR_ERG_hg19.fasta.gz',
-                'VR_FA1_hg19.fasta.gz',
-                'VR_HB13_hg19.fasta.gz']
-    kmer_arr = ['CTATACTACGG', 'CGATACTACGG']
+#    file_arr = ['VR-AR_VR-ERG_complete.fasta.gz',
+#                'VR-FA1_VR-HB13_complete.fasta.gz',
+#                'VR_AR_hg19.fasta.gz',
+#                'VR_ERG_hg19.fasta.gz',
+#                'VR_FA1_hg19.fasta.gz',
+#                'VR_HB13_hg19.fasta.gz']
+#    kmer_arr = ['CTATACTACGG', 'CGATACTACGG']
 #    for file in file_arr:
 #        in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/"+file
 #        kc11 = KmerCounter(11)
@@ -646,16 +661,16 @@ if __name__=="__main__":
 #        cnt_arr = [kc11.get_pair_cnt(kh) for kh in kh_arr]
 #        print(f'{file}  n_seq={kc11.n_seq} {kmer_arr[0]}   {cnt_arr[0]}   {kmer_arr[1]}  {cnt_arr[1]}')
     
-    print("\nCount all kmer mode\n")
-    for file in file_arr:
-        in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/"+file
-        kc11 = KmerCounter(11,unique_kmer_in_seq_mode=False)
-        kc11.scan_file(in_file)
-        
-        kh_arr = [kc11.kmer2hash(kmer) for kmer in kmer_arr]
-        cnt_arr = [kc11.get_pair_cnt(kh) for kh in kh_arr]
-        print(f'{file}  n_seq={kc11.n_total_kmer} {kmer_arr[0]}   {cnt_arr[0]}   {kmer_arr[1]}  {cnt_arr[1]}')
-    
+#    print("\nCount all kmer mode\n")
+#    for file in file_arr:
+#        in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/"+file
+#        kc11 = KmerCounter(11,unique_kmer_in_seq_mode=False)
+#        kc11.scan_file(in_file)
+#        
+#        kh_arr = [kc11.kmer2hash(kmer) for kmer in kmer_arr]
+#        cnt_arr = [kc11.get_pair_cnt(kh) for kh in kh_arr]
+#        print(f'{file}  n_seq={kc11.n_total_kmer} {kmer_arr[0]}   {cnt_arr[0]}   {kmer_arr[1]}  {cnt_arr[1]}')
+#    
     
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/TFAP2A.fasta"
 #    upper_file(in_file)
