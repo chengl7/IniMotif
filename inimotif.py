@@ -567,28 +567,30 @@ class FileProcessor:
         # create kmer counts and motif manager
         kc = KmerCounter(kmer_len, unique_kmer_in_seq_mode=unique_kmer_in_seq_mode, revcom_flag=revcom_flag)
         kc.scan_file(file_name, file_type=file_type)
+        print('kmer counter has scaned file')
         
         mm =  MotifManager(kc,consensus_seq, n_max_mutation=n_max_mutation, kmer_dict=kmer_dict, revcom_flag=revcom_flag)
-        mm.scan_file(in_file)
+        mm.scan_file(file_name)
+        print('motif manager has scaned file')
         
         # make plots and save results, TODO
         with open(self.preproc_res_file, 'wb') as f:
             pickle.dump([kc,mm,self], f)   # not sure if self could be pickled
         
-        kc.mk_kmer_dis_plot()
-        self.save_figure(self.kmer_hamdis_file)
-        
-        mm.mk_logo_plot(mm.forward_motif_mat)
-        self.save_figure(self.logo_forward_file)
-        
-        mm.mk_logo_plot(mm.revcom_motif_mat)
-        self.save_figure(self.logo_revcom_file)
-        
-        mm.mk_motif_posdis_plot()
-        self.save_figure(self.motif_posdis_file)
-        
-        mm.mk_bubble_plot()
-        self.save_figure(self.motif_cooccur_dis_file)
+#        kc.mk_kmer_dis_plot()
+#        self.save_figure(self.kmer_hamdis_file)
+#        
+#        mm.mk_logo_plot(mm.forward_motif_mat)
+#        self.save_figure(self.logo_forward_file)
+#        
+#        mm.mk_logo_plot(mm.revcom_motif_mat)
+#        self.save_figure(self.logo_revcom_file)
+#        
+#        mm.mk_motif_posdis_plot()
+#        self.save_figure(self.motif_posdis_file)
+#        
+#        mm.mk_bubble_plot()
+#        self.save_figure(self.motif_cooccur_dis_file)
         
         
     # make output directory if "outdir" does not exist
