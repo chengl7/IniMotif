@@ -98,7 +98,7 @@ class KmerCounter:
         com_hash = self.mask - in_hash  # complement hash
         # reverse
         ret_hash = self.twobit_mask & com_hash
-        for i in range(self.k-1):
+        for _ in range(self.k-1):
             ret_hash = ret_hash<<self.dtype(2)
             com_hash = com_hash>>self.dtype(2)
             ret_hash += self.twobit_mask & com_hash
@@ -158,15 +158,22 @@ class KmerCounter:
             return revcom_val+val
     
     # get top m kmers with the highest counts        
-    # return a turple, first column is kmer_hash:count pairs, the second column is revcom_kmer_hash: count   
+    # return a tuple, first row is forward kmer hash of top m kmers, second row is the corresponding reverse complements hash
     def get_top_kmers(self, m=6) -> Tuple:
         assert len(self.kmer_dict)>=2*m, f"requested number of kmer {2*m} is larger than the dictionary size {len(self.kmer_dict)}"
         
-        def gen_res(res):
-            kmer_hash_list = tuple( (x[0], self.kmer_dict[x[0]] ) for x in res )
-            revcom_hash_list = tuple( (self.revcom_hash(x[0]), self.kmer_dict.get(self.revcom_hash(x[0]), 0) ) for x in res )
-            return kmer_hash_list, revcom_hash_list
+        # # return a turple, first row is kmer_hash:count pairs, the second row is revcom_kmer_hash: count   
+        # def gen_res(res):
+        #     kmer_hash_list = tuple( (x[0], self.kmer_dict[x[0]] ) for x in res )
+        #     revcom_hash_list = tuple( (self.revcom_hash(x[0]), self.kmer_dict.get(self.revcom_hash(x[0]), 0) ) for x in res )
+        #     return kmer_hash_list, revcom_hash_list
         
+        # return a tuple, first row is forward kmer hash of top m kmers, second row is the corresponding reverse complements hash
+        def gen_res(res):
+            kmer_hash_list = tuple( x[0] for x in res )
+            revcom_hash_list = tuple( self.revcom_hash(x[0]) for x in res )
+            return kmer_hash_list, revcom_hash_list
+
         tmp_counter = Counter(self.kmer_dict)
         res = tmp_counter.most_common(m)
         if not self.revcom_flag:
@@ -272,6 +279,8 @@ class KmerCounter:
             tmpdict = self.scan_seq(str(rec.seq))
             self.merge_res(tmpdict)
         fh.close()
+
+        self.top_kmers_list = self.get_top_kmers()
         return self.kmer_dict
     
     # make kmer distribution plot
@@ -282,7 +291,46 @@ class KmerCounter:
         # to do, Alex
         # self.kmer_dict
         pass
-    
+
+    def disp_kmer_info(self, kmer_list=None):
+        if not kmer_list:
+            kmer_list = self.top_kmers_list[0]
+        
+        if self.revcom_flag:
+            info_str_arr = [f'Display {len(kmer_list)} kmer pairs (kmer & reverse complement), kmer_len={self.k}.', '']
+        else:
+            info_str_arr = [f'Display {len(kmer_list)} kmers, kmer_len={self.k}', '']
+
+        for e in kmer_list:
+            if type(e) == type('ACG'):
+                kmer = e
+                khash = self.kmer2hash(kmer)
+            elif type(e) == type(self.mask):
+                khash = e
+                kmer = self.hash2kmer(khash)
+            else:
+                print(f'Unkown input kmer hash type: {type(e)}, should be {type("ACG")} or {type(self.mask)}')
+                raise TypeError
+            
+            palindrome_flag = self.is_palindrome(kmer)
+            if palindrome_flag and self.revcom_flag:
+                info_str_arr.append(f'Total count is {self.get_pair_cnt(khash)}. This is a Palindrome.')
+            elif self.revcom_flag:
+                info_str_arr.append( f'Total count is {self.get_pair_cnt(khash)}' )
+            info_str_arr.append(f'{kmer} {self.kmer_dict[khash]}')
+
+            if self.revcom_flag:
+                rc_kmer = self.revcom(kmer)
+                rc_khash = self.kmer2hash(rc_kmer)
+                info_str_arr.append(f'{rc_kmer} {self.kmer_dict[rc_khash]}')
+            
+            info_str_arr.append('')
+
+        for info_str in info_str_arr:
+            print(info_str)
+
+        return info_str_arr
+
 class MotifManager:
     def __init__(self, kmer_counter, consensus_seq=None, n_max_mutation=2, kmer_dict=None, revcom_flag=True):
         """
@@ -614,10 +662,13 @@ if __name__=="__main__":
     in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/VR_ERG_hg19.fasta.gz"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/masked_VR_AR_hg19.fasta"
     
-    fp = FileProcessor(in_file, out_dir="./test", kmer_len=12)
+    # fp = FileProcessor(in_file, out_dir="./test", kmer_len=12)
     
-#    kc6 = KmerCounter(18)
-#    kc6.scan_file(in_file)
+    kc6 = KmerCounter(26, revcom_flag=False)
+    kc6.scan_file(in_file)
+
+    kc6.get_top_kmers(40)
+    kc6.disp_kmer_info()
     
 #    top_kmer_res = kc6.get_top_kmers()
 #    consensus = kc6.get_consensus()
