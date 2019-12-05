@@ -14,6 +14,9 @@ from itertools import product, combinations
 import matplotlib.pyplot as plt   
 import warnings
 from scipy.stats import norm
+from windows import gen_full_win_list
+from yattag import Doc,indent
+import warnings
 
 class KmerCounter:
     """
@@ -421,6 +424,126 @@ class MotifManager:
         for i,kh in enumerate(kmer_arr):
             cnt_arr[i] = self.kmer_dict.get(kh,0)
         return cnt_arr
+
+    # search motifs in the input sequence
+    # output: first element (list) is start positions of forward motif matching the input string
+    #         second element (list) is start positions of revcom motif matching the input string
+    def motif_match(self, in_str) -> Tuple:
+        in_str = in_str.upper()  # input string must be upper case
+        len_str = len(in_str)
+        k = self.kmer_counter.k
+
+        forward_pos_list = []
+        revcom_pos_list = []
+        both_pos_list = []  # positions match both forward motif and revcom motif
+        i=0
+        prev_hash = self.kmer_counter.dtype(-1)
+        while(i<=len_str-k):
+            tmpstr = in_str[i:i+k]
+            # omit a kmer if it contains "N"
+            if "N" in tmpstr:
+                i += 1 + max([pos for pos,char in enumerate(tmpstr) if char == 'N'])
+                prev_hash = self.kmer_counter.dtype(-1)
+                continue
+            if prev_hash==self.kmer_counter.dtype(-1):
+                tmphash = self.kmer_counter.kmer2hash(tmpstr)
+            # reuse hash in previous position
+            else:         
+                tmphash = (prev_hash<< self.kmer_counter.dtype(2) ) & self.kmer_counter.mask
+                tmphash += self.kmer_counter.base[ in_str[i+k-1] ]
+            prev_hash = tmphash
+            tmpflag1, tmpflag2 = False, False
+            if tmphash in self.forward_motif_ball:
+                forward_pos_list.append(i)
+                tmpflag1 = True
+            if not self.is_palindrome and self.revcom_flag:
+                if tmphash in self.revcom_motif_ball:
+                    revcom_pos_list.append(i)
+                    tmpflag2 = True
+            if tmpflag1 and tmpflag2:
+                both_pos_list.append(i)
+            i += 1
+        return forward_pos_list,revcom_pos_list
+
+    def output_match_html(self, file_name, file_type="fasta", outfile="motif_match.html"):
+        if file_name.endswith(".gz"):
+            fh = gzip.open(file_name,"rt")
+        else:
+            fh = open(file_name, "r")
+        style_str = """
+        p {
+            word-break: break-all;
+            white-space: normal;
+        }
+        forward{
+            color: red;
+        }
+        revcom{
+            color: blue;
+        }
+        overlap{
+            color: green;
+        }
+        """
+        doc, tag, text = Doc().tagtext()
+        # write html header
+        doc.asis('<!DOCTYPE html>')
+        with tag('html',lang="en"):
+            with tag('head'):
+                with tag('title'):
+                    text('Motif Sequences')
+                doc.stag('meta', charset="utf-8")
+                with tag('style'):
+                    text(style_str) # specify style
+            with tag('body'):
+                with tag('h1'):
+                    text('IniMotif')
+                with tag('h2'):
+                    text('Sequences contain motifs')
+                    doc.stag('br')
+                    text(f'num of maximal allowed mutations: {self.n_max_mutation}')
+                    doc.stag('br')
+                    text(f'forward consensus: ')
+                    with tag('forward'):
+                        text(self.consensus_seq)
+                    doc.stag('br')
+                    text(f'reverse complement: ')
+                    with tag('revcom'):
+                        text(self.kmer_counter.revcom(self.consensus_seq))
+                    doc.stag('br')
+                for rec in SeqIO.parse(fh,"fasta"):
+                    tmpseq = str(rec.seq).upper()
+                    fw_pos_list,rc_pos_list = self.motif_match(tmpseq)
+                    if not fw_pos_list and not rc_pos_list:
+                        continue
+                    win_list,win_type_list = gen_full_win_list(fw_pos_list, rc_pos_list, self.kmer_counter.k, len(tmpseq))
+
+                    with tag('p'):
+                        # output header 
+                        text(">"+rec.id)
+                        # output line break
+                        doc.stag('br')
+                        # output sequence
+                        for win,win_type in zip(win_list, win_type_list):
+                            if win_type==0:
+                                text(tmpseq[win[0]:win[1]])
+                            elif win_type==1:
+                                with tag('forward'):
+                                    text(tmpseq[win[0]:win[1]])
+                            elif win_type==2:
+                                with tag('revcom'):
+                                    text(tmpseq[win[0]:win[1]])
+                            elif win_type==3:
+                                with tag('overlap'):
+                                    text(tmpseq[win[0]:win[1]])
+                            else:
+                                warnings.warn(f'Unkown win_type={win_type}')
+        fh.close()
+
+        html_str = indent(doc.getvalue(), indent_text = True) # will also indent the text directly contained between <tag> and </tag>
+        with open(outfile,'w') as out_fh:
+            out_fh.write(html_str)
+
     
     # scan motif in a sequence
     def scan_seq(self, in_str, hamming_ball):
@@ -565,11 +688,11 @@ class MotifManager:
         
         # mutation=2 is too large for small kmers, done
         
-        # output top kmer information
-        # output count of a given kmer information
+        # output top kmer information, done
+        # output count of a given kmer information, done
         
-        # distance between motif on sequences, etc, to do 
-        # output sequences that contain motif and highlight the motifs, to do 
+        # distance between motif on sequences, etc, DONE
+        # output sequences that contain motif and highlight the motifs, DONE
 
 from Bio.Seq import Seq
 def upper_file(file_name, file_type="fasta"):
@@ -657,24 +780,27 @@ class FileProcessor:
 if __name__=="__main__":
     
     # in_file = sys.argv[1]
-#    in_file = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1"
+    in_file = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/VR_AR_hg19.fasta"
-    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/VR_ERG_hg19.fasta.gz"
+#    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/VR_ERG_hg19.fasta.gz"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/masked_VR_AR_hg19.fasta"
     
     # fp = FileProcessor(in_file, out_dir="./test", kmer_len=12)
     
-    kc6 = KmerCounter(26, revcom_flag=False)
+    kc6 = KmerCounter(6, revcom_flag=False)
     kc6.scan_file(in_file)
 
-    kc6.get_top_kmers(40)
-    kc6.disp_kmer_info()
+
+    # kc6.get_top_kmers(40)
+    # kc6.disp_kmer_info()
     
 #    top_kmer_res = kc6.get_top_kmers()
 #    consensus = kc6.get_consensus()
-#    
-#    mm =  MotifManager(kc6,consensus, n_max_mutation=0)
-#    mm.scan_file(in_file)
+#   
+    consensus = "CATGCC"
+    mm =  MotifManager(kc6, consensus, n_max_mutation=0)
+    # mm.scan_file(in_file)
+    mm.output_match_html(in_file)
     
 ##    from sklearn.neighbors import KernelDensity
 #    from scipy.stats import norm
