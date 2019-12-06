@@ -12,7 +12,7 @@ from tkinter.ttk import *
 
 import sys
 #import subprocess as sub
-from inimotif import FileProcessor
+from inimotif_main import FileProcessor,ChipSeqProcessor
 
 import time
 import threading
@@ -155,7 +155,7 @@ class Application(Frame):
         # collect input parameters, TODO
         self.chip_para_dict = {"file_name":"/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1",
                                "out_dir":"./test",
-                               "kmer_len":12}
+                               "kmer_len":8}
         
         
         irow = 5
@@ -176,8 +176,10 @@ class Application(Frame):
         def chipseq(**kwargs):
             self.progress.grid(row=4,column=0,columnspan=3)
             self.progress.start()
-            print(kwargs)
-            time.sleep(5)
+            #print(kwargs)
+            #time.sleep(5)
+            fp = FileProcessor(**kwargs)
+            fp.run()
             self.progress.stop()
             self.progress.grid_forget()
             
@@ -185,7 +187,8 @@ class Application(Frame):
             self.run_button['state']='normal'
 
         self.run_button['state']='disabled'
-        threading.Thread(target=chipseq,kwargs=self.chip_para_dict).start()
+        
+        threading.Thread(target=chipseq, kwargs=self.chip_para_dict).start()
     
     def start_selex_seq(self):
         self.state = 'selex-seq'
