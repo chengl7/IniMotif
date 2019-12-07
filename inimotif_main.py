@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os    
 import pickle
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from inimotif_core import KmerCounter, MotifManager
 from yattag import Doc,indent
@@ -80,7 +82,7 @@ class FileProcessor:
         self.save_figure( self.gen_absolute_path(self.motif_cooccur_dis_file) )
 
     # generate html file string for displaying figures etc.
-    def gen_html_str(self, img_dir):
+    def gen_html_str(self, img_dir, title=None):
         assert len(img_dir)>0, "image directory {img_dir} must be non-empty."
         if img_dir[-1]==os.sep:
             img_dir = img_dir[:-1]
@@ -91,7 +93,10 @@ class FileProcessor:
                      self.kmer_hamdis_file, self.motif_posdis_file, self.motif_cooccur_dis_file]
         doc, tag, text = Doc().tagtext()
         with tag('h2'):
-            text(f'K={kc.k}')
+            if title:
+                text(title)
+            else:
+                text(f'K={kc.k}')
         if mm.is_palindrome:
             tmpstr = 'palindrome'
         else:
@@ -113,6 +118,11 @@ class FileProcessor:
         with tag('p'):
             tmp_prec = round(mm.n_tfbs_seq/mm.n_seq*100,2)
             text(f'Number of motif (forward/revcom) Sequences: {mm.n_tfbs_seq} ({tmp_prec}%)')
+        with tag('p'):
+            text(f'Forward-Forward motif co-occurence index: {mm.ff_co_occur_index}')
+        with tag('p'):
+            text(f'Forward-RevCom motif co-occurence index: {mm.fr_co_occur_index}')
+
         with tag('div'):
             for imgf in img_files:
                 if imgf==self.kmer_hamdis_file:
@@ -123,17 +133,49 @@ class FileProcessor:
         return html_str
 
     # make output directory if "outdir" does not exist
-    def mkdir(self, outdir):
+    @staticmethod
+    def mkdir(outdir):
         if not os.path.exists(outdir):
             os.makedirs(outdir)
     
     def gen_absolute_path(self, filename):
         return os.path.join(self.out_dir,filename)
     
-    # save figure, to do 
-    def save_figure(self, file_name):
+    # save figure
+    @staticmethod
+    def save_figure(file_name):
         plt.savefig(file_name)
         plt.close()
+    
+    @staticmethod
+    def get_style_str():
+        style_str = """
+        body{
+            font-family: sans-serif, Arial, Helvetica;
+        }
+        h2 {
+            text-align: center;
+        }
+        div {
+            text-align: justify;
+        }
+        .hamdis{
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 80%;
+        }
+        div img {
+            display: inline-block;
+            width: 48%;
+        }
+        div:after {
+            content: '';
+            display: inline-block;
+            width: 100%;
+        }
+        """
+        return style_str
 
 
 class ChipSeqProcessor:
@@ -165,20 +207,9 @@ class ChipSeqProcessor:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
 
-    def run(self):
-        html_div_list = []
-        # run for different kmers
-        for kmer_len in range(self.min_kmer_len, self.max_kmer_len+1):
-            stem_dir = f'k{kmer_len}'
-            out_dir = self.out_dir + os.sep + stem_dir
-            fp = FileProcessor(file_name=self.file_name, file_type=self.file_type, out_dir=out_dir,
-              kmer_len=kmer_len, unique_kmer_in_seq_mode=self.unique_kmer_in_seq_mode, revcom_flag=self.revcom_flag, 
-              consensus_seq=self.consensus_seq, n_max_mutation=self.n_max_mutation, kmer_dict=self.kmer_dict)
-            fp.run()
-            html_div_list.append(fp.gen_html_str('./'+stem_dir))
-        
+    def gen_html(self, html_div_list):
         # generate html file
-        style_str = self._get_style_str()
+        style_str = FileProcessor.get_style_str()
         doc, tag, text = Doc().tagtext()
         doc.asis('<!DOCTYPE html>')
         with tag('html',lang="en"):
@@ -205,45 +236,181 @@ class ChipSeqProcessor:
         
         # output html string
         html_str = indent(doc.getvalue(), indent_text = True) # will also indent the text directly contained between <tag> and </tag>
+        return html_str
+
+    def run(self):
+        html_div_list = []
+        # run for different kmers
+        for kmer_len in range(self.min_kmer_len, self.max_kmer_len+1):
+            stem_dir = f'k{kmer_len}'
+            out_dir = self.out_dir + os.sep + stem_dir
+            fp = FileProcessor(file_name=self.file_name, file_type=self.file_type, out_dir=out_dir,
+              kmer_len=kmer_len, unique_kmer_in_seq_mode=self.unique_kmer_in_seq_mode, revcom_flag=self.revcom_flag, 
+              consensus_seq=self.consensus_seq, n_max_mutation=self.n_max_mutation, kmer_dict=self.kmer_dict)
+            fp.run()
+            html_div_list.append(fp.gen_html_str('./'+stem_dir))
+        
+        html_str = self.gen_html(html_div_list)
         outfile = self.out_dir + os.sep + self.identifier + '.html'
         with open(outfile,'w') as out_fh:
             out_fh.write(html_str)
-        
-    def _get_style_str(self):
-        style_str = """
-        body{
-            font-family: sans-serif, Arial, Helvetica;
-        }
-        h2 {
-            text-align: center;
-        }
-        div {
-            text-align: justify;
-        }
-        .hamdis{
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            width: 80%;
-        }
-        div img {
-            display: inline-block;
-            width: 48%;
-        }
-        div:after {
-            content: '';
-            display: inline-block;
-            width: 100%;
-        }
-        """
-        return style_str
-
-
 
 class SelexSeqProcessor:
-    pass
+    def __init__(self, file_name_arr=None, file_type="fasta", identifier='out', out_dir=".",
+              min_kmer_len=0, max_kmer_len=0, min_selex_round=0, max_selex_round=0, 
+              unique_kmer_in_seq_mode=True, revcom_flag=True, consensus_seq=None, n_max_mutation=2, kmer_dict=None):
+        assert len(out_dir)>0, "output directory must be non-empty string"
+        if out_dir[-1]==os.sep:
+            out_dir=out_dir[:-1]
+
+        # store input parameters
+        self.out_dir = out_dir
+        self.identifier = identifier
+
+        self.file_name_arr = file_name_arr
+        self.file_type = file_type
+
+        self.min_kmer_len = min_kmer_len
+        self.max_kmer_len = max_kmer_len
+
+        self.min_selex_round = min_selex_round
+        self.max_selex_round = max_selex_round
+
+        self.unique_kmer_in_seq_mode = unique_kmer_in_seq_mode
+        self.revcom_flag = revcom_flag
+
+        self.consensus_seq = consensus_seq
+        self.n_max_mutation = n_max_mutation
+        self.kmer_dict = kmer_dict
+
+        self.trend_figure_dir = 'trend_figure'
+
+        # make output directory
+        FileProcessor.mkdir(out_dir)
+
+        # make trend figure directory
+        FileProcessor.mkdir(self.out_dir + os.sep + self.trend_figure_dir)
+    
+    def run(self):
+        html_div_k_list = [[] for _ in range(self.max_kmer_len+1)]
+        html_div_r_list = [[] for _ in range(self.max_selex_round+1)]
+        # run for different kmers 
+        for kmer_len in range(self.min_kmer_len, self.max_kmer_len+1):
+            selex_res = []
+            for i_round,file_name in zip(range(self.min_selex_round, self.max_selex_round+1),self.file_name_arr):
+                stem_dir = f'r{i_round}k{kmer_len}'
+                out_dir = self.out_dir + os.sep + stem_dir
+                fp = FileProcessor(file_name=file_name, file_type=self.file_type, out_dir=out_dir,
+                    kmer_len=kmer_len, unique_kmer_in_seq_mode=self.unique_kmer_in_seq_mode, revcom_flag=self.revcom_flag, 
+                    consensus_seq=self.consensus_seq, n_max_mutation=self.n_max_mutation, kmer_dict=self.kmer_dict)
+                fp.run()
+                html_div_k_list[kmer_len].append(fp.gen_html_str('./'+stem_dir, title=f'Round={i_round} K={kmer_len}'))
+                selex_res.append(fp)
+            # generate kmer trend figure
+            self.gen_kmer_trend_fig(selex_res)
+            trend_fig_file = self.out_dir + os.sep + self.trend_figure_dir + os.sep + f'k{kmer_len}.png'
+            FileProcessor.save_figure( trend_fig_file )
+        
+        for kmer_len in range(self.min_kmer_len, self.max_kmer_len+1):
+            k_list = html_div_k_list[kmer_len]
+            for i_round,div in zip(range(self.min_selex_round, self.max_selex_round+1), k_list):
+                html_div_r_list[i_round].append(div)
+
+        # generate html for each round
+        for i_round in range(self.min_selex_round, self.max_selex_round+1):
+            html_str = self.gen_html_round(html_div_r_list[i_round], i_round)
+            outfile = self.out_dir + os.sep + self.identifier + f'_round_{i_round}.html'
+            with open(outfile,'w') as out_fh:
+                out_fh.write(html_str)
+        
+        # generate html for each kmer_len
+        for kmer_len in range(self.min_kmer_len, self.max_kmer_len+1):
+            html_str = self.gen_html_k(html_div_k_list[kmer_len], kmer_len, f'./{self.trend_figure_dir}', f'k{kmer_len}.png')
+            outfile = self.out_dir + os.sep + self.identifier + f'_k_{kmer_len}.html'
+            with open(outfile,'w') as out_fh:
+                out_fh.write(html_str)
+
+    # make kmer trend figure, Alex, TODO
+    def gen_kmer_trend_fig(self, selex_round_res_list):
+        pass
+
+    # generate html for kmer_len=k
+    def gen_html_k(self, html_div_list, kmer_len, trend_fig_dir, trend_fig_name):
+        # generate html file
+        style_str = FileProcessor.get_style_str()
+        doc, tag, text = Doc().tagtext()
+        doc.asis('<!DOCTYPE html>')
+        with tag('html',lang="en"):
+            with tag('head'):
+                with tag('title'):
+                    text('SELEX-Seq Result')
+                doc.stag('meta', charset="utf-8")
+                doc.stag('meta', name="viewport", content="width=device-width, initial-scale=1")
+                with tag('style'):
+                    text(style_str) # specify style
+            with tag('body'):
+                with tag('h1'):
+                    text(f'IniMotif: SELEX-seq Results. kmer_len={kmer_len}')
+                with tag('h2'):
+                    text(f'identifier={self.identifier}')
+                    doc.stag('br')
+                    text(f'minimum round number: {self.min_selex_round}')
+                    doc.stag('br')
+                    text(f'maximum round number: {self.max_selex_round}')
+                    doc.stag('br')
+                for tmpstr in html_div_list:
+                    doc.stag('hr')
+                    doc.asis(tmpstr)
+                # add trend figure
+                doc.stag('hr')
+                with tag('h2'):
+                    text('SELEX kmer trend figure')
+                with tag('div'):
+                    doc.stag('img', klass="hamdis", src=trend_fig_dir+'/'+trend_fig_name, alt=trend_fig_name,  onclick=f"window.open('{trend_fig_dir}/{trend_fig_name}', '_blank');")
+        
+        # output html string
+        html_str = indent(doc.getvalue(), indent_text = True) # will also indent the text directly contained between <tag> and </tag>
+        return html_str
+
+    def gen_html_round(self, html_div_list, i_round):
+        # generate html file
+        style_str = FileProcessor.get_style_str()
+        doc, tag, text = Doc().tagtext()
+        doc.asis('<!DOCTYPE html>')
+        with tag('html',lang="en"):
+            with tag('head'):
+                with tag('title'):
+                    text(f'SELEX-Seq Result, Round {i_round}')
+                doc.stag('meta', charset="utf-8")
+                doc.stag('meta', name="viewport", content="width=device-width, initial-scale=1")
+                with tag('style'):
+                    text(style_str) # specify style
+            with tag('body'):
+                with tag('h1'):
+                    text(f'IniMotif: SELEX-Seq Result, Round {i_round}')
+                with tag('h2'):
+                    text(f'identifier={self.identifier}')
+                    doc.stag('br')
+                    text(f'minimum kmer length: {self.min_kmer_len}')
+                    doc.stag('br')
+                    text(f'maximum kmer length: {self.max_kmer_len}')
+                    doc.stag('br')
+                for tmpstr in html_div_list:
+                    doc.stag('hr')
+                    doc.asis(tmpstr)
+        
+        # output html string
+        html_str = indent(doc.getvalue(), indent_text = True) # will also indent the text directly contained between <tag> and </tag>
+        return html_str
+
 
 if __name__=="__main__":
-    in_file = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1"
-    csp = ChipSeqProcessor(file_name=in_file,identifier='NF',min_kmer_len=6, max_kmer_len=7,out_dir='/Users/lcheng/Documents/github/IniMotif/NF')
-    csp.run()
+    # in_file = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1"
+    # csp = ChipSeqProcessor(file_name=in_file,identifier='NF',min_kmer_len=6, max_kmer_len=7,out_dir='/Users/lcheng/Documents/github/IniMotif/NF')
+    # csp.run()
+
+    in_dir = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/"
+    file_list = ['NF1-1','NF1-2','NF1-3','NF1-4']
+    file_name_arr = [in_dir+f for f in file_list]
+    ssp = SelexSeqProcessor(file_name_arr=file_name_arr,identifier='NF',min_kmer_len=6, max_kmer_len=7,min_selex_round=1,max_selex_round=4,out_dir='/Users/lcheng/Documents/github/IniMotif/NF1')
+    ssp.run()

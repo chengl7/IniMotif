@@ -687,9 +687,9 @@ class MotifManager:
         plt.xlabel('Relative position')
         plt.ylabel('Kernel density')
         if self.revcom_flag and not self.is_palindrome:
-            plt.legend(('forward',))
+            plt.legend(('forward','revcom'))
         else:
-            plt.legend(('forward', 'revcom'))
+            plt.legend(('forward'))
         plt.show()
         
         
