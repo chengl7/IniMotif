@@ -11,6 +11,9 @@ import gzip
 from collections import Counter
 from typing import Tuple,Set
 from itertools import product, combinations
+
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt   
 import warnings
 from scipy.stats import norm
@@ -688,9 +691,6 @@ class MotifManager:
         else:
             plt.legend(('forward', 'revcom'))
         plt.show()
-        
-    
-        
         
         
 # TODO: motif location on sequence

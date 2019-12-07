@@ -55,7 +55,7 @@ class FileProcessor:
         print('motif manager has scaned input file')
         
         # make plots and save results
-        with open(self.preproc_res_file, 'wb') as f:
+        with open( self.gen_absolute_path(self.preproc_res_file), 'wb') as f:
             pickle.dump(self, f)   # not sure if self could be pickled, TODO
         
         self.mk_plots()
@@ -88,12 +88,10 @@ class FileProcessor:
         mm = self.motif_manager
         kc = self.kmer_counter
         img_files = [self.logo_forward_file, self.logo_revcom_file,
-                    self.motif_posdis_file, self.kmer_hamdis_file, self.motif_cooccur_dis_file]
+                     self.kmer_hamdis_file, self.motif_posdis_file, self.motif_cooccur_dis_file]
         doc, tag, text = Doc().tagtext()
         with tag('h2'):
             text(f'K={kc.k}')
-        with tag('p'):
-            text(f'Total number of input sequences: {mm.n_seq}')
         if mm.is_palindrome:
             tmpstr = 'palindrome'
         else:
@@ -102,6 +100,10 @@ class FileProcessor:
             text(f'Consensus (forward) [{tmpstr}]: {mm.consensus_seq}')
         with tag('p'):
             text(f'Consensus (revcom) [{tmpstr}]: {kc.revcom(mm.consensus_seq)}')
+        with tag('p'):
+            text(f'Number of maximum allowed mutations: {mm.n_max_mutation}')
+        with tag('p'):
+            text(f'Total number of input sequences: {mm.n_seq}')
         with tag('p'):
             tmp_prec = round(mm.n_tfbs_forward_seq/mm.n_seq*100,2)
             text(f'Number of Forward motif Sequences: {mm.n_tfbs_forward_seq} ({tmp_prec}%) ')
@@ -113,7 +115,10 @@ class FileProcessor:
             text(f'Number of motif (forward/revcom) Sequences: {mm.n_tfbs_seq} ({tmp_prec}%)')
         with tag('div'):
             for imgf in img_files:
-                doc.stag('img', src=img_dir+'/'+imgf, alt=imgf,  onclick=f"window.open('{img_dir}/{imgf}', '_blank');")
+                if imgf==self.kmer_hamdis_file:
+                    doc.stag('img', klass="hamdis", src=img_dir+'/'+imgf, alt=imgf,  onclick=f"window.open('{img_dir}/{imgf}', '_blank');")
+                else:
+                    doc.stag('img', src=img_dir+'/'+imgf, alt=imgf,  onclick=f"window.open('{img_dir}/{imgf}', '_blank');")
         html_str = indent(doc.getvalue(), indent_text = True) # will also indent the text directly contained between <tag> and </tag>
         return html_str
 
@@ -214,6 +219,12 @@ class ChipSeqProcessor:
         }
         div {
             text-align: justify;
+        }
+        .hamdis{
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 80%;
         }
         div img {
             display: inline-block;

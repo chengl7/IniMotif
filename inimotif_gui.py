@@ -123,7 +123,9 @@ class Application(Frame):
         
         self.chip_para_dict = {"file_name":"/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1",
                                "out_dir":"./test",
-                               "kmer_len":12}
+                               "identifier":"NF1",
+                               "min_kmer_len":10,
+                               "max_kmer_len":12}
         
         identifier_label = Label(master, text="Identifier")
         identifier_entry = Entry(master)
@@ -155,7 +157,9 @@ class Application(Frame):
         # collect input parameters, TODO
         self.chip_para_dict = {"file_name":"/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1",
                                "out_dir":"./test",
-                               "kmer_len":8}
+                               "identifier":"NF1",
+                               "min_kmer_len":10,
+                               "max_kmer_len":12}
         
         
         irow = 5
@@ -176,10 +180,8 @@ class Application(Frame):
         def chipseq(**kwargs):
             self.progress.grid(row=4,column=0,columnspan=3)
             self.progress.start()
-            #print(kwargs)
-            #time.sleep(5)
-            fp = FileProcessor(**kwargs)
-            fp.run()
+            csp = ChipSeqProcessor(**kwargs)
+            csp.run()
             self.progress.stop()
             self.progress.grid_forget()
             
