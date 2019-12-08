@@ -58,7 +58,7 @@ class FileProcessor:
         
         # make plots and save results
         with open( self.gen_absolute_path(self.preproc_res_file), 'wb') as f:
-            pickle.dump(self, f)   # not sure if self could be pickled, TODO
+            pickle.dump(self, f)   # current FileProcessor be pickled
         
         self.mk_plots()
 
@@ -147,6 +147,13 @@ class FileProcessor:
         plt.savefig(file_name)
         plt.close()
     
+    # load preprocessed data
+    @staticmethod
+    def load_pickle(in_file):
+        with open(in_file,'rb') as file:
+            fp = pickle.load(file)   # an FileProcessor object
+            return fp
+
     @staticmethod
     def get_style_str():
         style_str = """
@@ -409,8 +416,13 @@ if __name__=="__main__":
     # csp = ChipSeqProcessor(file_name=in_file,identifier='NF',min_kmer_len=6, max_kmer_len=7,out_dir='/Users/lcheng/Documents/github/IniMotif/NF')
     # csp.run()
 
-    in_dir = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/"
-    file_list = ['NF1-1','NF1-2','NF1-3','NF1-4']
-    file_name_arr = [in_dir+f for f in file_list]
-    ssp = SelexSeqProcessor(file_name_arr=file_name_arr,identifier='NF',min_kmer_len=6, max_kmer_len=7,min_selex_round=1,max_selex_round=4,out_dir='/Users/lcheng/Documents/github/IniMotif/NF1')
-    ssp.run()
+    # load preprocessed result
+    in_file = "/Users/lcheng/Documents/github/IniMotif/NF/k6/preproc.pickle"
+    fp = FileProcessor.load_pickle(in_file)
+    fp.kmer_counter.disp_kmer_info()
+
+    # in_dir = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/"
+    # file_list = ['NF1-1','NF1-2','NF1-3','NF1-4']
+    # file_name_arr = [in_dir+f for f in file_list]
+    # ssp = SelexSeqProcessor(file_name_arr=file_name_arr,identifier='NF',min_kmer_len=6, max_kmer_len=7,min_selex_round=1,max_selex_round=4,out_dir='/Users/lcheng/Documents/github/IniMotif/NF1')
+    # ssp.run()
