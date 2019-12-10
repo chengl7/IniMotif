@@ -358,7 +358,8 @@ class KmerCounter:
 
         plt.xlabel("Hamming distance")
         plt.ylabel("Kmer count")
-        plt.savefig("start", dpi=600)
+        plt.title("Hamming Distance K: "+str(self.k)+" Total kmers: "+str(sum(self.kmer_dict.values())))
+        plt.savefig("Hamming_Distance_"+str(self.k), dpi=600)
         plt.close()
         #pass
 
@@ -727,7 +728,7 @@ class MotifManager:
         pwm = seqlogo.CompletePm(pfm = motif_mat, ppm = None, pwm = None, background = None, pseudocount = None,
                  alphabet_type = 'DNA', alphabet = None, default_pm = 'pwm')
 
-        seqlogo.seqlogo(pwm, format="png", filename=str(k), alphabet="DNA", alphabet_type="DNA")
+        seqlogo.seqlogo(pwm, format="png", filename="Logo_"+str(k), alphabet="DNA", alphabet_type="DNA")
         #pass
 
     # make motif position distribution plot
