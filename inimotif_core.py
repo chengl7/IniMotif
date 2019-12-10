@@ -14,17 +14,22 @@ from itertools import product, combinations
 
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt   
+import matplotlib.pyplot as plt
 import warnings
 from scipy.stats import norm
 from windows import gen_full_win_list
 from yattag import Doc,indent
 import warnings
 
+from adjustText import adjust_text
+import random
+import pandas as pd
+import seqlogo
+
 class KmerCounter:
     """
     general class for counting kmers from an input string
-    
+
     Attributes:
         k: length of kmer
         revcom_flag: bool, counting reverse complement or not
@@ -33,7 +38,7 @@ class KmerCounter:
     def __init__(self, k, revcom_flag=True, unique_kmer_in_seq_mode=True):
         assert k>0, "kmer length should be greater than 0"
         assert k<32, "kmer should be shorter than 32 bases"
-        
+
         if k<16:
             self.dtype = np.uint32
         elif k<32:
@@ -41,30 +46,30 @@ class KmerCounter:
         else:
             print("kmer should be shorter than 32 bases")
             raise ValueError
-        
+
         self.k = k
         self.revcom_flag = revcom_flag
         self.unique_kmer_in_seq_mode = unique_kmer_in_seq_mode
-        
+
         base_map = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
         self.base = {bk:self.dtype(base_map[bk]) for bk in base_map}
         self.revcom_dict = {'A':'T', 'C':'G', 'G':'C', 'T':'A', 'N':'N'}
-        
+
         self.mask = self.gen_hash_mask(k)
         self.twobit_mask = self.dtype(3) # 0b11
-        
+
         self.kmer_dict = {}
         self.top_kmers_list = None
-        
+
         self.n_seq = 0
         self.n_total_kmer = 0
-    
+
     # generate a hash mask for kmers such that bits out of scope can be masked to 0
     def gen_hash_mask(self,k):
         assert k<32, "kmer should be shorter than 32 bases"
         mask = self.dtype((1<<2*k)-1)
         return mask
-    
+
     def kmer2hash(self, kmer):
         """
         kmer: input sequence
@@ -93,12 +98,12 @@ class KmerCounter:
             hashkey = (hashkey>>self.dtype(2))
             arr[-i]=base[mask & hashkey]
         return arr.tostring().decode("utf-8")
-    
+
     # return reverse complement of input string
     def revcom(self, in_str):
         rev_in_str = in_str[::-1]
         return "".join([self.revcom_dict[c] for c in rev_in_str])
-    
+
     # return reverse complement of input hash
     def revcom_hash(self, in_hash):
         com_hash = self.mask - in_hash  # complement hash
@@ -109,7 +114,7 @@ class KmerCounter:
             com_hash = com_hash>>self.dtype(2)
             ret_hash += self.twobit_mask & com_hash
         return ret_hash
-    
+
     # scan kmers in a sequence
     def scan_seq(self, in_str):
         in_str = in_str.upper()  # input string must be upper case
@@ -128,22 +133,22 @@ class KmerCounter:
             if prev_hash==self.dtype(-1):
                 tmphash = self.kmer2hash(tmpstr)
             # reuse hash in previous position
-            else:         
+            else:
                 tmphash = (prev_hash<<self.dtype(2)) & self.mask
                 tmphash += self.base[ in_str[i+k-1] ]
             prev_hash = tmphash
             res_dict[tmphash] = res_dict.get(tmphash,0)+1
             i += 1
         return res_dict
-    
+
     # merge the counted kmers
     def merge_res(self, kmer_dict) -> None:
         for key in kmer_dict:
             # a kmer is only counted once in a input string in kmer_dict
             val = 1 if self.unique_kmer_in_seq_mode else kmer_dict[key]
             self.kmer_dict[key] = self.kmer_dict.get(key,0) + val
-            self.n_total_kmer += kmer_dict[key] 
-    
+            self.n_total_kmer += kmer_dict[key]
+
     # check if a kmer is palindrome
     def is_palindrome(self, kmer, kmer_type="string"):
         if type(kmer)==type('ACT'):
@@ -152,7 +157,7 @@ class KmerCounter:
             return kmer==self.revcom_hash(kmer)
         else:
             raise Exception(f'Invalid kmer type: {type(kmer)}')
-    
+
     # get the combined counts for kmer and its rev. com.
     def get_pair_cnt(self, kmer_hash):
         revcom_hash = self.revcom_hash(kmer_hash)
@@ -162,18 +167,18 @@ class KmerCounter:
             return val
         else:
             return revcom_val+val
-    
-    # get top m kmers with the highest counts        
+
+    # get top m kmers with the highest counts
     # return a tuple, first row is forward kmer hash of top m kmers, second row is the corresponding reverse complements hash
     def get_top_kmers(self, m=6) -> Tuple:
         assert len(self.kmer_dict)>=2*m, f"requested number of kmer {2*m} is larger than the dictionary size {len(self.kmer_dict)}"
-        
-        # # return a turple, first row is kmer_hash:count pairs, the second row is revcom_kmer_hash: count   
+
+        # # return a turple, first row is kmer_hash:count pairs, the second row is revcom_kmer_hash: count
         # def gen_res(res):
         #     kmer_hash_list = tuple( (x[0], self.kmer_dict[x[0]] ) for x in res )
         #     revcom_hash_list = tuple( (self.revcom_hash(x[0]), self.kmer_dict.get(self.revcom_hash(x[0]), 0) ) for x in res )
         #     return kmer_hash_list, revcom_hash_list
-        
+
         # return a tuple, first row is forward kmer hash of top m kmers, second row is the corresponding reverse complements hash
         def gen_res(res):
             kmer_hash_list = tuple( x[0] for x in res )
@@ -185,14 +190,14 @@ class KmerCounter:
         if not self.revcom_flag:
             self.top_kmers_list = gen_res(res)
             return self.top_kmers_list
-        
+
         # consider reverse complement
         ## get dictionary by summing reverse complement's counts
         def get_revcom_dict(in_dict):
             out_dict = {}
             for tmp_key in in_dict:
                 tmp_val = in_dict[tmp_key]
-                
+
                 tmp_revcom_key = self.revcom_hash(tmp_key)
                 tmp_revcom_val = self.kmer_dict.get(tmp_revcom_key,0)
                 if tmp_revcom_key in out_dict:
@@ -210,18 +215,18 @@ class KmerCounter:
         ## a top kmer must have the following minimum counts
         top_min_cnt = sorted([top_dict[k] for k in top_dict if top_dict[k]>0])[-m]
         top_min_half_cnt = top_min_cnt/2
-        
+
         ## filter the dictionary by top_min_cnt
         top_dict = {k:self.kmer_dict[k] for k in self.kmer_dict if self.kmer_dict[k]>=top_min_half_cnt}
         top_dict = get_revcom_dict(top_dict)
-        
+
         ## get the top m kmers from sumed dictionary
         tmp_counter = Counter(top_dict)
         res = tmp_counter.most_common(m)
-        
+
         self.top_kmers_list = gen_res(res)
         return self.top_kmers_list
-    
+
     # get the consensus sequence from the kmer dictionary
     def get_consensus(self, ret_string=True):
         if self.top_kmers_list:
@@ -234,7 +239,7 @@ class KmerCounter:
             return kmer
         else:
             return kmer_hash
-        
+
     # get the hamming ball
     def get_hamming_ball(self, kmer_hash, n_max_mutation=2) -> Set:
         def mutate(kmer_hash, pos):
@@ -244,16 +249,16 @@ class KmerCounter:
                 tmpmask += (self.twobit_mask << self.dtype(2*p) )
                 base_list.append(self.twobit_mask & (kmer_hash>> self.dtype(2*p) ))
             tmpbase = self.dtype((~tmpmask) & self.mask & kmer_hash)
-            
+
             def my_gen(m):
                 return [i for i in range(4) if i!=m]
-            
+
             for e in product(*[my_gen(b) for b in base_list]):
                 tmphash = tmpbase
                 for i,p in enumerate(pos):
-                    tmphash += (e[i]<< self.dtype(2*p) ) 
+                    tmphash += (e[i]<< self.dtype(2*p) )
                 yield type(self.mask)(tmphash) # also works for pos=()
-        
+
         res_set = set()
         assert self.k>n_max_mutation, f"number of mutation {n_max_mutation} >= kmer length {self.k}"
         for i_mutation in range(n_max_mutation+1):
@@ -263,22 +268,22 @@ class KmerCounter:
                     # print(f'add {self.hash2kmer(kh)}')
                     res_set.add(kh)
         return res_set
-        
+
     def scan_file(self, file_name, file_type="fasta"):
         """
         file_name: input DNA sequence file name
-        file_type: fasta, fastq, 
+        file_type: fasta, fastq,
         """
         self.n_seq = 0
         self.n_total_kmer = 0
         self.kmer_dict = {}
         self.top_kmers_list = None
-        
+
         if file_name.endswith(".gz"):
             fh = gzip.open(file_name,"rt")
         else:
             fh = open(file_name, "r")
-        
+
         for rec in SeqIO.parse(fh,"fasta"):
             self.n_seq += 1
             tmpdict = self.scan_seq(str(rec.seq))
@@ -287,7 +292,7 @@ class KmerCounter:
 
         self.top_kmers_list = self.get_top_kmers()
         return self.kmer_dict
-    
+
     # make kmer distribution plot
     # plot kmer distribution around the given consensus sequence
     def mk_kmer_dis_plot(self, consensus_seq=None):
@@ -295,12 +300,72 @@ class KmerCounter:
             consensus_seq = self.get_consensus()
         # to do, Alex
         # self.kmer_dict
-        pass
+        k = self.k
+
+        def hamming_distance(s1, s2):
+            if len(s1) != len(s2):
+                raise ValueError("Undefined for sequences of unequal length")
+            return sum(ch1 != ch2 for ch1, ch2 in zip(s1, s2))
+
+        khams = {}
+        for p in range(k+1):
+            khams.update({p : {}})
+
+        for hkmer in list(self.kmer_dict.keys()):
+            hrkmer = self.revcom_hash(hkmer)
+            ham = hamming_distance(consensus, self.hash2kmer(hkmer))
+            rham = hamming_distance(consensus, self.hash2kmer(hrkmer))
+            if ham <= rham:
+                khams[ham].update({hkmer: self.kmer_dict[hkmer]})
+            if ham > rham:
+                khams[rham].update({hkmer: self.kmer_dict[hkmer]})
+
+        colours = ['C0', 'C0', 'C1', 'C1', 'C2', 'C2', 'C3', 'C3', 'C4', 'C4', 'C5', 'C5', 'C6', 'C6', 'C7', 'C7']
+        labelcolours = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7']
+
+        checkset = set()
+        for l in range(len(self.top_kmers_list)):
+            for e in self.top_kmers_list[l]:
+                checkset.add(e)
+
+        top6x, top6y, order, labels, texts, handels = ([] for _ in range(6))
+        for h in khams:
+            x = []
+            y = []
+            for k in list(khams[h].keys()):
+                if k in checkset:
+                    top6x.append(float(h)+random.uniform(-0.3, 0.3))
+                    top6y.append(khams[h][k])
+                    order.append(k)
+                if k not in checkset:
+                    x.append(float(h)+random.uniform(-0.3, 0.3))
+                    y.append(khams[h][k])
+
+            plt.scatter(x, y, color='0.75', alpha=0.7, s=1)
+
+        for i in range(len(order)):
+            plt.scatter(top6x[i], top6y[i], label=str(self.hash2kmer(k)), color=colours[i], s=3)
+            texts.append(plt.text(float(top6x[i]), float(top6y[i]-0.3), str(self.hash2kmer(order[i])),color=colours[i+1//2], fontsize=5))
+        for i in range(len(order)//2):
+            labels.append((str(self.hash2kmer(order[i]))+' '+str(self.hash2kmer(self.revcom_hash(order[i])))+' '+str(self.get_pair_cnt(order[i*2]))))
+
+        adjust_text(texts, lw=0.5)
+
+        leg = plt.legend(labels, fontsize=7)
+        for i in range(len(labels)):
+            leg.legendHandles[i].set_color(labelcolours[i])
+            leg.legendHandles[i]._sizes = [8]
+
+        plt.xlabel("Hamming distance")
+        plt.ylabel("Kmer count")
+        plt.savefig("start", dpi=600)
+        plt.close()
+        #pass
 
     def disp_kmer_info(self, kmer_list=None):
         if not kmer_list:
             kmer_list = self.top_kmers_list[0]
-        
+
         if self.revcom_flag:
             info_str_arr = [f'Display {len(kmer_list)} kmer pairs (kmer & reverse complement), kmer_len={self.k}.', '']
         else:
@@ -316,7 +381,7 @@ class KmerCounter:
             else:
                 print(f'Unkown input kmer hash type: {type(e)}, should be {type("ACG")} or {type(self.mask)}')
                 raise TypeError
-            
+
             palindrome_flag = self.is_palindrome(kmer)
             if palindrome_flag and self.revcom_flag:
                 info_str_arr.append(f'Total count is {self.get_pair_cnt(khash)}. This is a Palindrome.')
@@ -328,7 +393,7 @@ class KmerCounter:
                 rc_kmer = self.revcom(kmer)
                 rc_khash = self.kmer2hash(rc_kmer)
                 info_str_arr.append(f'{rc_kmer} {self.kmer_dict[rc_khash]}')
-            
+
             info_str_arr.append('')
 
         for info_str in info_str_arr:
@@ -358,35 +423,35 @@ class MotifManager:
             w_str = f'n_max_mutation={n_max_mutation} must be smaller than 1/4 of kmer length k={kmer_counter.k}.'+"\n"+f'Changed to n_max_mutation={new_val} now.'
             warnings.warn(w_str,UserWarning)
             n_max_mutation = new_val
-            
+
         self.kmer_counter = kmer_counter
         self.n_max_mutation = n_max_mutation
         self.revcom_flag = revcom_flag
-        
+
         self.consensus_hash = kmer_counter.kmer2hash(self.consensus_seq)
         self.forward_motif_ball = kmer_counter.get_hamming_ball(self.consensus_hash, n_max_mutation)
         self.con_revcom_hash = kmer_counter.revcom_hash(self.consensus_hash)
         self.revcom_motif_ball = set([kmer_counter.revcom_hash(kh) for kh in self.forward_motif_ball ])
         self.is_palindrome = self.consensus_hash==self.con_revcom_hash
-        
-        # data for motif logo construction 
+
+        # data for motif logo construction
         if revcom_flag and not self.is_palindrome:
             self.cntarr = self.get_pair_cntarr(self.forward_motif_ball)
         else:
             self.cntarr = self.get_kmers_cntarr(self.forward_motif_ball)
-            
+
         self.forward_motif_mat = self.gen_motif_cnt_mat(self.forward_motif_ball, self.cntarr)
         self.revcom_motif_mat = np.flipud(self.forward_motif_mat.copy()[:,::-1])
-            
+
         # data for motif position figure
         self.bins = np.arange(0,1+0.01,0.01)
         self.tfbs_pos_dis_forward = np.zeros(len(self.bins)-1 ,dtype="float")
         self.tfbs_pos_dis_revcom = np.zeros(len(self.bins)-1,dtype="float")
-        
+
         # data for number of binding sites on sequences
         self.n_tfbs_forward_arr = np.zeros(kmer_counter.n_seq, dtype="int")  # number of tfbs (forward motif) on each input sequence
         self.n_tfbs_revcom_arr = np.zeros(kmer_counter.n_seq, dtype="int")
-        
+
         # number of all sequences
         self.n_seq = kmer_counter.n_seq
 
@@ -398,7 +463,7 @@ class MotifManager:
         # co-occurence of motif
         self.ff_co_occur_index = 0  # forward-forward motif co-occurence
         self.fr_co_occur_index = 0  # forward-reverse motif co-occurence
-    
+
     # generate the motif count matrix, same dimension as position weight matrix (pwm)
     def gen_motif_cnt_mat(self, kmerhash_arr, cnt_arr):
         k = self.kmer_counter.k
@@ -408,7 +473,7 @@ class MotifManager:
                 tmpbase = (kh>>self.kmer_counter.dtype(2*i)) & self.kmer_counter.twobit_mask
                 mat[tmpbase, i] += kc
         return mat
-    
+
     # get the combined counts for kmer and its rev. com.
     def get_pair_cnt(self, kmer_hash):
         revcom_hash = self.kmer_counter.revcom_hash(kmer_hash)
@@ -418,13 +483,13 @@ class MotifManager:
             return val
         else:
             return revcom_val+val
-    
+
     def get_pair_cntarr(self, kmer_arr):
         cnt_arr = np.zeros(len(kmer_arr),dtype='int')
         for i,kh in enumerate(kmer_arr):
             cnt_arr[i] = self.get_pair_cnt(kh)
         return cnt_arr
-    
+
     def get_kmers_cntarr(self, kmer_arr):
         cnt_arr = np.zeros(len(kmer_arr),dtype='int')
         for i,kh in enumerate(kmer_arr):
@@ -454,7 +519,7 @@ class MotifManager:
             if prev_hash==self.kmer_counter.dtype(-1):
                 tmphash = self.kmer_counter.kmer2hash(tmpstr)
             # reuse hash in previous position
-            else:         
+            else:
                 tmphash = (prev_hash<< self.kmer_counter.dtype(2) ) & self.kmer_counter.mask
                 tmphash += self.kmer_counter.base[ in_str[i+k-1] ]
             prev_hash = tmphash
@@ -533,7 +598,7 @@ class MotifManager:
                     win_list,win_type_list = gen_full_win_list(fw_pos_list, rc_pos_list, self.kmer_counter.k, len(tmpseq))
 
                     with tag('p'):
-                        # output header 
+                        # output header
                         text(">"+rec.id)
                         # output line break
                         doc.stag('br')
@@ -558,13 +623,13 @@ class MotifManager:
         with open(outfile,'w') as out_fh:
             out_fh.write(html_str)
 
-    
+
     # scan motif in a sequence
     def scan_seq(self, in_str, hamming_ball):
         in_str = in_str.upper()  # input string must be upper case
         len_str = len(in_str)
         k = self.kmer_counter.k
-        
+
         res_list = []
         i=0
         prev_hash = self.kmer_counter.dtype(-1)
@@ -578,35 +643,35 @@ class MotifManager:
             if prev_hash==self.kmer_counter.dtype(-1):
                 tmphash = self.kmer_counter.kmer2hash(tmpstr)
             # reuse hash in previous position
-            else:         
+            else:
                 tmphash = (prev_hash<< self.kmer_counter.dtype(2) ) & self.kmer_counter.mask
                 tmphash += self.kmer_counter.base[ in_str[i+k-1] ]
             prev_hash = tmphash
             if tmphash in hamming_ball:
-                res_list.append(i)            
+                res_list.append(i)
             i += 1
-        
+
         res_list = [e/(len_str-k) for e in res_list]  # record relative position on the string
         res = np.histogram(res_list, self.bins) # res is a tuple, res[0] are the counts, res[1] are the bins edge
-        
+
         return res[0]
-    
+
     def merge_res_forward(self, pos_cnt) -> None:
         self.tfbs_pos_dis_forward += pos_cnt
-    
+
     def merge_res_revcom(self, pos_cnt) -> None:
         self.tfbs_pos_dis_revcom += pos_cnt
-    
+
     def scan_file(self, file_name, file_type="fasta"):
         """
         file_name: input DNA sequence file name
-        file_type: fasta, fastq, 
+        file_type: fasta, fastq,
         """
         if file_name.endswith(".gz"):
             fh = gzip.open(file_name,"rt")
         else:
             fh = open(file_name, "r")
-        
+
         for i,rec in enumerate(SeqIO.parse(fh,"fasta")):
             tmpseq = str(rec.seq)
             tmpcnt = self.scan_seq(tmpseq, self.forward_motif_ball)
@@ -617,26 +682,26 @@ class MotifManager:
                 self.merge_res_revcom(tmpcnt)
                 self.n_tfbs_revcom_arr[i] = sum(tmpcnt)
         fh.close()
-        
+
         if self.revcom_flag:
             self.n_tfbs_seq = sum( np.logical_or(self.n_tfbs_forward_arr>0, self.n_tfbs_revcom_arr>0) )
         else:
             self.n_tfbs_seq = sum( self.n_tfbs_forward_arr>0 )
-        
+
         tmpn1 = sum(self.n_tfbs_forward_arr>0)
         tmpn2 = sum(self.n_tfbs_forward_arr>1) # more than 1 motifs on sequence
         self.ff_co_occur_index = tmpn2/tmpn1  # forward-forward co-occurence index
-        
+
         self.n_tfbs_forward_seq = tmpn1
         self.n_tfbs_revcom_seq = sum(self.n_tfbs_revcom_arr>0)
         self.n_tfbs_seq = sum(np.logical_or( self.n_tfbs_forward_arr>0, self.n_tfbs_revcom_arr>0))
 
         if self.revcom_flag and not self.is_palindrome:
             tmpn1 = sum(np.logical_or( self.n_tfbs_forward_arr>0, self.n_tfbs_revcom_arr>0))
-            tmpn2 = sum(np.logical_and( self.n_tfbs_forward_arr>0, self.n_tfbs_revcom_arr>0)) 
+            tmpn2 = sum(np.logical_and( self.n_tfbs_forward_arr>0, self.n_tfbs_revcom_arr>0))
             self.fr_co_occur_index = tmpn2/tmpn1
-            
-            
+
+
     # make bubble plot for motif (forward & revcom) co-occurences
     def mk_bubble_plot(self) -> None:
         tfbs_arr = np.vstack((self.n_tfbs_forward_arr, self.n_tfbs_revcom_arr))
@@ -652,14 +717,19 @@ class MotifManager:
         plt.ylabel('Number of revcom motif on sequence')
         plt.ioff()
         plt.show()
-        
-    # make motif logo    
-    def mk_logo_plot(self, motif_mat) -> None:
+
+    # make motif logo
+    def mk_logo_plot(self, motif_mat):
         # to do, Alex
         # e.g. self.forward_motif_mat, 4 x k count matrix
-        # self.gen_motif_cnt_mat
-        pass
-        
+        k = self.kmer_counter.k
+
+        pwm = seqlogo.CompletePm(pfm = motif_mat, ppm = None, pwm = None, background = None, pseudocount = None,
+                 alphabet_type = 'DNA', alphabet = None, default_pm = 'pwm')
+
+        seqlogo.seqlogo(pwm, format="png", filename=str(k), alphabet="DNA", alphabet_type="DNA")
+        #pass
+
     # make motif position distribution plot
     def mk_motif_posdis_plot(self) -> None:
         def kde_smooth(x):
@@ -667,19 +737,19 @@ class MotifManager:
             std = 5
             density = sum(xi*norm.pdf(x_kde, mu, std) for mu,xi in enumerate(x))
             return density/sum(density)
-        
+
         # kernel smoothing
         y_sum_forward = sum(self.tfbs_pos_dis_forward)
         y_sum_revcom = sum(self.tfbs_pos_dis_revcom)
         p_forward = float(y_sum_forward)/(y_sum_forward+y_sum_revcom)
         p_revcom = 1-p_forward
-        
+
         den_forward = p_forward * kde_smooth(self.tfbs_pos_dis_forward)
         if self.revcom_flag and not self.is_palindrome:
             den_revcom = p_revcom * kde_smooth(self.tfbs_pos_dis_revcom)
-        
+
         x_kde = np.linspace(0,len(self.tfbs_pos_dis_forward),1000)
-        
+
         plt.plot(x_kde,den_forward)
         if self.revcom_flag and not self.is_palindrome:
             plt.plot(x_kde,den_revcom)
@@ -691,21 +761,21 @@ class MotifManager:
         else:
             plt.legend(('forward'))
         plt.show()
-        
-        
+
+
 # TODO: motif location on sequence
         # number of motif on sequence, done
-        
+
         # using bubble plot to display the joint number of motifs, done
-        
+
         # forward-forward co-occurence index, done
         # forward-revcom co-occurence index, done
-        
+
         # mutation=2 is too large for small kmers, done
-        
+
         # output top kmer information, done
         # output count of a given kmer information, done
-        
+
         # distance between motif on sequences, etc, DONE
         # output sequences that contain motif and highlight the motifs, DONE
 
@@ -713,19 +783,19 @@ class MotifManager:
 # def upper_file(file_name, file_type="fasta"):
 #     """
 #     file_name: input DNA sequence file name
-#     file_type: fasta, fastq, 
+#     file_type: fasta, fastq,
 #     """
 #     if file_name.endswith(".gz"):
 #         fh = gzip.open(file_name,"rt")
 #     else:
 #         fh = open(file_name, "r")
-    
+
 #     outfile = file_name+".upper.fasta"
 #     foh = open(outfile,'w')
 #     for rec in SeqIO.parse(fh,"fasta"):
 #         rec.seq = Seq(str(rec.seq).upper())
 #         SeqIO.write(rec,foh,'fasta')
-        
+
 #     fh.close()
 #     foh.close()
 
@@ -733,54 +803,55 @@ class Masker:
     def __init__(self):
         pass
 
-    
+
 if __name__=="__main__":
-    
+
     # in_file = sys.argv[1]
-    in_file = "/Users/lcheng/Documents/github/IniMotif-py/exampledata/NF1-1"
+    in_file = "/home/alex/Desktop/IniMotif/Data/NF1-3t"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/VR_AR_hg19.fasta"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/VR_ERG_hg19.fasta.gz"
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/masked_VR_AR_hg19.fasta"
-    
+
     # fp = FileProcessor(in_file, out_dir="./test", kmer_len=12)
-    
+
     kc6 = KmerCounter(6, revcom_flag=False)
     kc6.scan_file(in_file)
 
-
     # kc6.get_top_kmers(40)
     # kc6.disp_kmer_info()
-    
+
 #    top_kmer_res = kc6.get_top_kmers()
-#    consensus = kc6.get_consensus()
-#   
-    consensus = "CATGCC"
+    consensus = kc6.get_consensus()
+#
+#    consensus = "CATGCC"
     mm =  MotifManager(kc6, consensus, n_max_mutation=0)
     # mm.scan_file(in_file)
+    KmerCounter.mk_kmer_dis_plot(kc6)
+    mm.mk_logo_plot(mm.forward_motif_mat)
     mm.output_match_html(in_file)
-    
+
 ##    from sklearn.neighbors import KernelDensity
 #    from scipy.stats import norm
-#    
+#
 #    x = mm.tfbs_pos_dis_forward
 #    x_d = np.linspace(0,len(x),1000)
 #    density = sum(xi*norm.pdf(x_d, mu, 10) for mu,xi in enumerate(x))
 #    plt.fill_between(x_d, density, alpha=0.5)
 #    plt.show()
-#    
-    
+#
+
 #    mm.mk_motif_posdis_plot()
-    
+
 #    mm.mk_bubble_plot()
-    
+
 #    con_hash = kc6.kmer2hash(consensus)
 #    print(f"consensus={consensus}")
-#    
+#
 #    hamball = kc6.get_hamming_ball(con_hash,n_max_mutation=2)
 #    for kh in hamball:
 #        print(kc6.hash2kmer(kh))
-        
-    
+
+
 #    file_arr = ['VR-AR_VR-ERG_complete.fasta.gz',
 #                'VR-FA1_VR-HB13_complete.fasta.gz',
 #                'VR_AR_hg19.fasta.gz',
@@ -792,24 +863,21 @@ if __name__=="__main__":
 #        in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/"+file
 #        kc11 = KmerCounter(11)
 #        kc11.scan_file(in_file)
-#        
+#
 #        kh_arr = [kc11.kmer2hash(kmer) for kmer in kmer_arr]
 #        cnt_arr = [kc11.get_pair_cnt(kh) for kh in kh_arr]
 #        print(f'{file}  n_seq={kc11.n_seq} {kmer_arr[0]}   {cnt_arr[0]}   {kmer_arr[1]}  {cnt_arr[1]}')
-    
+
 #    print("\nCount all kmer mode\n")
 #    for file in file_arr:
 #        in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/gz_files/"+file
 #        kc11 = KmerCounter(11,unique_kmer_in_seq_mode=False)
 #        kc11.scan_file(in_file)
-#        
+#
 #        kh_arr = [kc11.kmer2hash(kmer) for kmer in kmer_arr]
 #        cnt_arr = [kc11.get_pair_cnt(kh) for kh in kh_arr]
 #        print(f'{file}  n_seq={kc11.n_total_kmer} {kmer_arr[0]}   {cnt_arr[0]}   {kmer_arr[1]}  {cnt_arr[1]}')
-#    
-    
+#
+
 #    in_file = "/Users/lcheng/Documents/github/IniMotif-py/gonghong/TFAP2A.fasta"
 #    upper_file(in_file)
-
-
-        
