@@ -340,8 +340,6 @@ class KmerCounter:
 
         while len(checkarray) > 0:
             hkmer = checkarray[0]
-            print(hkmer)
-            print(checkarray)
             hrkmer = self.revcom_hash(hkmer)
             ham = hamming_distance(consensus, self.hash2kmer(hkmer))
             rham = hamming_distance(consensus, self.hash2kmer(hrkmer))
