@@ -307,47 +307,68 @@ class KmerCounter:
                 raise ValueError("Undefined for sequences of unequal length")
             return sum(ch1 != ch2 for ch1, ch2 in zip(s1, s2))
 
-        khams = {}
-        for p in range(k+1):
-            khams.update({p : {}})
-
-        for hkmer in list(self.kmer_dict.keys()):
-            hrkmer = self.revcom_hash(hkmer)
-            ham = hamming_distance(consensus, self.hash2kmer(hkmer))
-            rham = hamming_distance(consensus, self.hash2kmer(hrkmer))
-            if ham <= rham:
-                khams[ham].update({hkmer: self.kmer_dict[hkmer]})
-            if ham > rham:
-                khams[rham].update({hkmer: self.kmer_dict[hkmer]})
-
         colours = ['C0', 'C0', 'C1', 'C1', 'C2', 'C2', 'C3', 'C3', 'C4', 'C4', 'C5', 'C5', 'C6', 'C6', 'C7', 'C7']
         labelcolours = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7']
 
         checkset = set()
+        checkarray = []
         for l in range(len(self.top_kmers_list)):
             for e in self.top_kmers_list[l]:
                 checkset.add(e)
+                checkarray.append(e)
+        checkarray = list(dict.fromkeys(checkarray))
 
         top6x, top6y, order, labels, texts, handels = ([] for _ in range(6))
-        for h in khams:
-            x = []
-            y = []
-            for k in list(khams[h].keys()):
-                if k in checkset:
-                    top6x.append(float(h)+random.uniform(-0.3, 0.3))
-                    top6y.append(khams[h][k])
-                    order.append(k)
-                if k not in checkset:
-                    x.append(float(h)+random.uniform(-0.3, 0.3))
-                    y.append(khams[h][k])
 
-            plt.scatter(x, y, color='0.75', alpha=0.7, s=1)
+        self.kmer_dict = {k: v for k, v in sorted(self.kmer_dict.items(), key=lambda item: item[1], reverse=True)}
+
+        x = []
+        y = []
+        for hkmer in list(self.kmer_dict.keys()):
+            hrkmer = self.revcom_hash(hkmer)
+            ham = hamming_distance(consensus, self.hash2kmer(hkmer))
+            rham = hamming_distance(consensus, self.hash2kmer(hrkmer))
+            if hkmer not in checkset:
+                if ham <= rham:
+                    x.append(float(ham)+random.uniform(-0.3, 0.3))
+                    y.append(self.kmer_dict[hkmer])
+                if ham > rham:
+                    x.append(float(rham)+random.uniform(-0.3, 0.3))
+                    y.append(self.kmer_dict[hkmer])
+
+        plt.scatter(x, y, color='0.75', alpha=0.7, s=1)
+
+        while len(checkarray) > 0:
+            hkmer = checkarray[0]
+            hrkmer = self.revcom_hash(hkmer)
+            ham = hamming_distance(consensus, self.hash2kmer(hkmer))
+            rham = hamming_distance(consensus, self.hash2kmer(hrkmer))
+            if ham <= rham:
+                top6x.append(float(ham)+random.uniform(-0.3, 0.3))
+                top6y.append(self.kmer_dict[hkmer])
+                order.append(hkmer)
+                checkarray.remove(hkmer)
+                if hkmer != hrkmer:
+                    top6x.append(float(ham)+random.uniform(-0.3, 0.3))
+                    top6y.append(self.kmer_dict[hrkmer])
+                    order.append(hrkmer)
+                    checkarray.remove(hrkmer)
+            if ham > rham:
+                top6x.append(float(rham)+random.uniform(-0.3, 0.3))
+                top6y.append(self.kmer_dict[hkmer])
+                order.append(hkmer)
+                checkarray.remove(hkmer)
+                if hkmer != hrkmer:
+                    top6x.append(float(rham)+random.uniform(-0.3, 0.3))
+                    top6y.append(self.kmer_dict[hrkmer])
+                    order.append(hrkmer)
+                    checkarray.remove(hrkmer)
 
         for i in range(len(order)):
-            plt.scatter(top6x[i], top6y[i], label=str(self.hash2kmer(k)), color=colours[i], s=3)
-            texts.append(plt.text(float(top6x[i]), float(top6y[i]-0.3), str(self.hash2kmer(order[i])),color=colours[i+1//2], fontsize=5))
-        for i in range(len(order)//2):
-            labels.append((str(self.hash2kmer(order[i]))+' '+str(self.hash2kmer(self.revcom_hash(order[i])))+' '+str(self.get_pair_cnt(order[i*2]))))
+            plt.scatter(top6x[i], top6y[i], label=str(self.hash2kmer(order[i])), color=colours[i], s=3)
+            texts.append(plt.text(float(top6x[i]), float(top6y[i]-0.3), str(self.hash2kmer(order[i]))+" "+str(self.kmer_dict[order[i]]),color=colours[i+1//2], fontsize=5))
+        for i in range(0, len(order), 2):
+            labels.append((str(self.hash2kmer(order[i]))+' '+str(self.hash2kmer(order[i+1]))+' '+str(self.get_pair_cnt(order[i]))))
 
         adjust_text(texts, lw=0.5)
 
@@ -361,7 +382,6 @@ class KmerCounter:
         plt.title("Hamming Distance K: "+str(self.k)+" Total kmers: "+str(sum(self.kmer_dict.values())))
         plt.savefig("Hamming_Distance_"+str(self.k), dpi=600)
         plt.close()
-        #pass
 
     def disp_kmer_info(self, kmer_list=None):
         if not kmer_list:
@@ -828,7 +848,7 @@ if __name__=="__main__":
     mm =  MotifManager(kc6, consensus, n_max_mutation=0)
     # mm.scan_file(in_file)
     KmerCounter.mk_kmer_dis_plot(kc6)
-    mm.mk_logo_plot(mm.forward_motif_mat)
+#    mm.mk_logo_plot(mm.forward_motif_mat)
     mm.output_match_html(in_file)
 
 ##    from sklearn.neighbors import KernelDensity
