@@ -295,11 +295,13 @@ class KmerCounter:
 
     # make kmer distribution plot
     # plot kmer distribution around the given consensus sequence
-    def mk_kmer_dis_plot(self, consensus_seq=None):
+    def mk_kmer_dis_plot(self, consensus_seq=None, hampathname=None):
         if not consensus_seq:
             consensus_seq = self.get_consensus()
+        print(consensus_seq)
+        if not hampathname:
+            hampathname = "hamdis_"+str(self.k)
         # to do, Alex
-        # self.kmer_dict
         k = self.k
 
         def hamming_distance(s1, s2):
@@ -320,14 +322,12 @@ class KmerCounter:
 
         top6x, top6y, order, labels, texts, handels = ([] for _ in range(6))
 
-        self.kmer_dict = {k: v for k, v in sorted(self.kmer_dict.items(), key=lambda item: item[1], reverse=True)}
-
         x = []
         y = []
         for hkmer in list(self.kmer_dict.keys()):
             hrkmer = self.revcom_hash(hkmer)
-            ham = hamming_distance(consensus, self.hash2kmer(hkmer))
-            rham = hamming_distance(consensus, self.hash2kmer(hrkmer))
+            ham = hamming_distance(consensus_seq, self.hash2kmer(hkmer))
+            rham = hamming_distance(consensus_seq, self.hash2kmer(hrkmer))
             if hkmer not in checkset:
                 if ham <= rham:
                     x.append(float(ham)+random.uniform(-0.3, 0.3))
@@ -341,8 +341,8 @@ class KmerCounter:
         while len(checkarray) > 0:
             hkmer = checkarray[0]
             hrkmer = self.revcom_hash(hkmer)
-            ham = hamming_distance(consensus, self.hash2kmer(hkmer))
-            rham = hamming_distance(consensus, self.hash2kmer(hrkmer))
+            ham = hamming_distance(consensus_seq, self.hash2kmer(hkmer))
+            rham = hamming_distance(consensus_seq, self.hash2kmer(hrkmer))
             if ham <= rham:
                 top6x.append(float(ham)+random.uniform(-0.3, 0.3))
                 top6y.append(self.kmer_dict[hkmer])
@@ -380,7 +380,8 @@ class KmerCounter:
         plt.xlabel("Hamming distance")
         plt.ylabel("Kmer count")
         plt.title("Hamming Distance K: "+str(self.k)+" Total kmers: "+str(sum(self.kmer_dict.values())))
-        plt.savefig("Hamming_Distance_"+str(self.k), dpi=600)
+        plt.savefig(hampathname)
+        #plt.show()
         plt.close()
 
     def disp_kmer_info(self, kmer_list=None):
@@ -724,7 +725,9 @@ class MotifManager:
 
 
     # make bubble plot for motif (forward & revcom) co-occurences
-    def mk_bubble_plot(self) -> None:
+    def mk_bubble_plot(self, coocpathname=None) -> None:
+        if not coocpathname:
+            coocpathname = "cooccurdis_"+str(self.kmer_counter.k)
         tfbs_arr = np.vstack((self.n_tfbs_forward_arr, self.n_tfbs_revcom_arr))
         uniq_pairs,uniq_cnt = np.unique(tfbs_arr, axis=1, return_counts=True)
         # do not display non motif sequences for better visualization
@@ -736,23 +739,28 @@ class MotifManager:
         plt.title(f'{self.n_tfbs_seq} out of {self.n_seq} ({perc}%) sequences contain TFBS')
         plt.xlabel('Number of forward motif on sequence')
         plt.ylabel('Number of revcom motif on sequence')
-        plt.ioff()
-        plt.show()
+        plt.savefig(coocpathname)
+        plt.close()
+        #plt.ioff()
+        #plt.show()
 
     # make motif logo
-    def mk_logo_plot(self, motif_mat):
+    def mk_logo_plot(self, motif_mat, logopathname=None):
         # to do, Alex
-        # e.g. self.forward_motif_mat, 4 x k count matrix
         k = self.kmer_counter.k
+
+        if not logopathname:
+            logopathname = "logo_"+str(k)
 
         pwm = seqlogo.CompletePm(pfm = motif_mat, ppm = None, pwm = None, background = None, pseudocount = None,
                  alphabet_type = 'DNA', alphabet = None, default_pm = 'pwm')
 
-        seqlogo.seqlogo(pwm, format="png", filename="Logo_"+str(k), alphabet="DNA", alphabet_type="DNA")
-        #pass
+        seqlogo.seqlogo(pwm, format="png", filename=logopathname, alphabet="DNA", alphabet_type="DNA")
 
     # make motif position distribution plot
-    def mk_motif_posdis_plot(self) -> None:
+    def mk_motif_posdis_plot(self, pospathname=None) -> None:
+        if not pospathname:
+            pospathname = "posdis_"+str(self.kmer_counter.k)
         def kde_smooth(x):
             x_kde = np.linspace(0,len(x),1000)
             std = 5
@@ -781,7 +789,10 @@ class MotifManager:
             plt.legend(('forward','revcom'))
         else:
             plt.legend(('forward'))
-        plt.show()
+        plt.savefig(pospathname)
+        plt.close()
+        #plt.ioff()
+        #plt.show()
 
 
 # TODO: motif location on sequence
@@ -847,7 +858,7 @@ if __name__=="__main__":
 #    consensus = "CATGCC"
     mm =  MotifManager(kc6, consensus, n_max_mutation=0)
     # mm.scan_file(in_file)
-    KmerCounter.mk_kmer_dis_plot(kc6)
+#    KmerCounter.mk_kmer_dis_plot(kc6)
 #    mm.mk_logo_plot(mm.forward_motif_mat)
     mm.output_match_html(in_file)
 
