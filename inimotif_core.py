@@ -295,12 +295,13 @@ class KmerCounter:
 
     # make kmer distribution plot
     # plot kmer distribution around the given consensus sequence
-    def mk_kmer_dis_plot(self, consensus_seq=None):
+    def mk_kmer_dis_plot(self, consensus_seq=None, hampathname=None):
         if not consensus_seq:
             consensus_seq = self.get_consensus()
         print(consensus_seq)
+        if not hampathname:
+            hampathname = "hamdis_"+str(self.k)
         # to do, Alex
-        # self.kmer_dict
         k = self.k
 
         def hamming_distance(s1, s2):
@@ -379,9 +380,9 @@ class KmerCounter:
         plt.xlabel("Hamming distance")
         plt.ylabel("Kmer count")
         plt.title("Hamming Distance K: "+str(self.k)+" Total kmers: "+str(sum(self.kmer_dict.values())))
-        plt.show()
-        #plt.savefig("Hamming_Distance_"+str(self.k), dpi=600)
-        #plt.close()
+        plt.savefig(hampathname)
+        #plt.show()
+        plt.close()
 
     def disp_kmer_info(self, kmer_list=None):
         if not kmer_list:
@@ -724,7 +725,9 @@ class MotifManager:
 
 
     # make bubble plot for motif (forward & revcom) co-occurences
-    def mk_bubble_plot(self) -> None:
+    def mk_bubble_plot(self, coocpathname=None) -> None:
+        if not coocpathname:
+            coocpathname = "cooccurdis_"+str(self.kmer_counter.k)
         tfbs_arr = np.vstack((self.n_tfbs_forward_arr, self.n_tfbs_revcom_arr))
         uniq_pairs,uniq_cnt = np.unique(tfbs_arr, axis=1, return_counts=True)
         # do not display non motif sequences for better visualization
@@ -736,26 +739,28 @@ class MotifManager:
         plt.title(f'{self.n_tfbs_seq} out of {self.n_seq} ({perc}%) sequences contain TFBS')
         plt.xlabel('Number of forward motif on sequence')
         plt.ylabel('Number of revcom motif on sequence')
-        plt.ioff()
-        plt.show()
+        plt.savefig(coocpathname)
+        plt.close()
+        #plt.ioff()
+        #plt.show()
 
     # make motif logo
-    def mk_logo_plot(self, motif_mat, loc_name):
+    def mk_logo_plot(self, motif_mat, logopathname=None):
         # to do, Alex
-        # e.g. self.forward_motif_mat, 4 x k count matrix
-        if not loc_name:
-            loc_name = "Logo_"+str(k)
-
         k = self.kmer_counter.k
+
+        if not logopathname:
+            logopathname = "logo_"+str(k)
 
         pwm = seqlogo.CompletePm(pfm = motif_mat, ppm = None, pwm = None, background = None, pseudocount = None,
                  alphabet_type = 'DNA', alphabet = None, default_pm = 'pwm')
 
-        seqlogo.seqlogo(pwm, format="png", filename=loc_name, alphabet="DNA", alphabet_type="DNA")
-        #pass
+        seqlogo.seqlogo(pwm, format="png", filename=logopathname, alphabet="DNA", alphabet_type="DNA")
 
     # make motif position distribution plot
-    def mk_motif_posdis_plot(self) -> None:
+    def mk_motif_posdis_plot(self, pospathname=None) -> None:
+        if not pospathname:
+            pospathname = "posdis_"+str(self.kmer_counter.k)
         def kde_smooth(x):
             x_kde = np.linspace(0,len(x),1000)
             std = 5
@@ -784,8 +789,10 @@ class MotifManager:
             plt.legend(('forward','revcom'))
         else:
             plt.legend(('forward'))
-        plt.ioff()
-        plt.show()
+        plt.savefig(pospathname)
+        plt.close()
+        #plt.ioff()
+        #plt.show()
 
 
 # TODO: motif location on sequence
