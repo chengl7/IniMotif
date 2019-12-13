@@ -6,6 +6,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from inimotif_core import KmerCounter, MotifManager
 from yattag import Doc,indent
+import numpy as np
+import math
 
 class FileProcessor:
     def __init__(self, file_name=None, file_type="fasta", out_dir=".",
@@ -67,20 +69,20 @@ class FileProcessor:
         kc = self.kmer_counter
         mm = self.motif_manager
 
-        kc.mk_kmer_dis_plot()
-        self.save_figure( self.gen_absolute_path(self.kmer_hamdis_file) )
+        kc.mk_kmer_dis_plot(hampathname=self.gen_absolute_path(self.kmer_hamdis_file))
+        #self.save_figure( self.gen_absolute_path(self.kmer_hamdis_file) )
 
-        mm.mk_logo_plot(mm.forward_motif_mat, self.gen_absolute_path(self.logo_forward_file))
+        mm.mk_logo_plot(mm.forward_motif_mat, logopathname=self.gen_absolute_path(self.logo_forward_file))
         #self.save_figure( self.gen_absolute_path(self.logo_forward_file) )
 
-        mm.mk_logo_plot(mm.revcom_motif_mat, self.gen_absolute_path(self.logo_revcom_file))
+        mm.mk_logo_plot(mm.revcom_motif_mat, logopathname=self.gen_absolute_path(self.logo_revcom_file))
         #self.save_figure( self.gen_absolute_path(self.logo_revcom_file) )
 
-        mm.mk_motif_posdis_plot()
-        self.save_figure( self.gen_absolute_path(self.motif_posdis_file) )
+        mm.mk_motif_posdis_plot(pospathname=self.gen_absolute_path(self.motif_posdis_file))
+        #self.save_figure( self.gen_absolute_path(self.motif_posdis_file) )
 
-        mm.mk_bubble_plot()
-        self.save_figure( self.gen_absolute_path(self.motif_cooccur_dis_file) )
+        mm.mk_bubble_plot(coocpathname=self.gen_absolute_path(self.motif_cooccur_dis_file))
+        #self.save_figure( self.gen_absolute_path(self.motif_cooccur_dis_file) )
 
     # generate html file string for displaying figures etc.
     def gen_html_str(self, img_dir, title=None):
@@ -317,7 +319,7 @@ class SelexSeqProcessor:
             # generate kmer trend figures
             self.gen_kmer_trend_fig(selex_res)
             trend_fig_file = self.out_dir + os.sep + self.trend_figure_dir + os.sep + f'k{kmer_len}.png'
-            FileProcessor.save_figure( trend_fig_file )
+            #FileProcessor.save_figure( trend_fig_file )
 
         for kmer_len in range(self.min_kmer_len, self.max_kmer_len+1):
             k_list = html_div_k_list[kmer_len]
@@ -339,9 +341,126 @@ class SelexSeqProcessor:
                 out_fh.write(html_str)
 
     # make kmer trend figure, Alex, TODO
-    def gen_kmer_trend_fig(self, selex_round_res_list):
+    def gen_kmer_trend_fig(self, selex_round_res_list, pathname=None):
+        numrounds = (self.max_selex_round-self.min_selex_round)
+        k = selex_round_res_list[numrounds].kmer_counter.k
+        if not pathname:
+            pathname = "kmerfreq_"+str(selex_round_res_list[numrounds].kmer_counter.k)
 
-        pass
+        totaldict = {}
+        for r in range(numrounds+1):
+            selex_round_res_list[r].kmer_counter.kmer_dict = {k: v for k, v in sorted(selex_round_res_list[r].kmer_counter.kmer_dict.items(), key=lambda item: item[1], reverse=True)}
+            totaldict.update({r: sum(selex_round_res_list[r].kmer_counter.kmer_dict.values())})
+
+        topcheckset = set()
+        topcheckarray = []
+        for l in range(len(selex_round_res_list[numrounds].kmer_counter.top_kmers_list)):
+            for e in selex_round_res_list[numrounds].kmer_counter.top_kmers_list[l]:
+                topcheckset.add(e)
+                topcheckarray.append(e)
+        topcheckarray = list(dict.fromkeys(topcheckarray))
+
+        def colours1():
+            colours = list(selex_round_res_list[numrounds].kmer_counter.kmer_dict.keys())[5:66]
+            for i in topcheckset:
+                if i in colours:
+                    colours.remove(i)
+            return colours
+
+        colours = colours1()
+
+        def makeyaxistop(i):
+            yaxis1 = ([])
+            for l in range(numrounds+1):
+                f = selex_round_res_list[l].kmer_counter.get_pair_cnt(i)/totaldict[l]
+                if f == 0:
+                    f = 1/totaldict[l]
+                freq = (f/(1-f))
+                yaxis1.append(math.log10(freq))
+            return yaxis1
+
+        def makeyaxisbottom(i):
+            yaxis1 = ([])
+            for l in range(numrounds+1):
+                f = selex_round_res_list[l].kmer_counter.get_pair_cnt(i)/totaldict[l]
+                freq = (f/(1-f))
+                yaxis1.append(freq)
+            return yaxis1
+
+        def grapher():
+
+            xaxis = ([])
+            for r in range(self.min_selex_round, self.max_selex_round+1):
+                xaxis.append(r)
+
+            fig = plt.figure(figsize=(10,10))
+            grid = plt.GridSpec(2, 3, wspace=0.4, hspace=0.3)
+
+            top = fig.add_subplot(grid[:-1,:])
+            top.set_xlabel("SELEX round")
+            top.set_ylabel("log(f/(1-f))")
+            top.set_title("Kmer frequency"+', K: '+str(k))
+            top.set_xlim([((self.min_selex_round-1)), (self.max_selex_round+2)])
+            top.set_xticks(np.linspace((self.min_selex_round-1), (self.max_selex_round), num=(numrounds+2), endpoint=True))
+            top.spines['right'].set_visible(False)
+            top.spines['top'].set_visible(False)
+
+            bottom = fig.add_subplot(grid[-1,:-1])
+            bottom.set_xlabel("SELEX round")
+            bottom.set_ylabel("f = (kmer/total)")
+            bottom.set_title("Kmer frequency")
+            bottom.set_xlim([((self.min_selex_round-1)), (self.max_selex_round+2)])
+            bottom.set_xticks(np.linspace((self.min_selex_round-1), (self.max_selex_round), num=(numrounds+2), endpoint=True))
+            bottom.spines['right'].set_visible(False)
+            bottom.spines['top'].set_visible(False)
+
+            bar = fig.add_subplot(grid[-1,-1:])
+            bar.set_xlabel("SELEX round")
+            bar.set_ylabel("Total kmers")
+            bar.set_title("Kmer total distribution")
+            bar.set_xticks(xaxis)
+            bar.set_xlim(self.min_selex_round-1, self.max_selex_round+1)
+
+            colourslist = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7']
+
+            kmerlist = list(selex_round_res_list[numrounds].kmer_counter.kmer_dict.keys())
+            for p in range(67):
+                ckmer = kmerlist[p]
+                fc = selex_round_res_list[numrounds].kmer_counter.kmer_dict[ckmer]
+                rc = selex_round_res_list[numrounds].kmer_counter.kmer_dict[selex_round_res_list[numrounds].kmer_counter.revcom_hash(ckmer)]
+                if fc > rc:
+                    if ckmer in topcheckset:
+                        top.plot(xaxis, makeyaxistop(ckmer), color=colourslist[(topcheckarray.index(ckmer))], linewidth=2, marker="s", markevery=None, zorder=(66-p))
+                        bottom.plot(xaxis, makeyaxisbottom(ckmer), color=colourslist[(topcheckarray.index(ckmer))], linewidth=2, marker="s", markevery=None, zorder=(66-p))
+                    if ckmer in colours:
+                        top.plot(xaxis, makeyaxistop(ckmer), linewidth=1, marker=".", markevery=None, zorder=(66-p))
+                        bottom.plot(xaxis, makeyaxisbottom(ckmer), linewidth=1, marker=".", markevery=None, zorder=(66-p))
+                    if fc == rc:
+                        continue
+
+            if k <= 5:
+                step = 1
+            if k > 5:
+                step = int(round(len(kmerlist)/1000, 0))
+            for p in range(67, len(kmerlist), step):
+                top.plot(xaxis, makeyaxistop(kmerlist[p]), color = '0.75', linestyle='--', linewidth=0.5, marker="x", markevery=None, alpha=0.5, zorder=0)
+                bottom.plot(xaxis, makeyaxisbottom(kmerlist[p]), color = '0.75', linestyle='--', linewidth=0.5, marker="x", markevery=None, alpha=0.5, zorder=0)
+
+            ymint, ymaxt = top.get_ylim()
+            ypost = np.linspace(ymint, ymaxt, num=20, endpoint=True)
+            yminb, ymaxb = bottom.get_ylim()
+            yposb = np.linspace(yminb, ymaxb, num=20, endpoint=True)
+            for n, i in enumerate(topcheckarray[:6]):
+                paircount =  selex_round_res_list[numrounds].kmer_counter.get_pair_cnt(i)
+                f = (paircount/totaldict[numrounds])
+                top.annotate((str(n+1)+". "+str(selex_round_res_list[numrounds].kmer_counter.hash2kmer(i))+" / "+str(selex_round_res_list[numrounds].kmer_counter.hash2kmer(selex_round_res_list[numrounds].kmer_counter.revcom_hash(i)))), (self.max_selex_round, math.log10(f/(1-f))), (self.max_selex_round+0.2, ypost[-(n+2)]), size=10, fontname='monospace', weight='bold', arrowprops=dict(color=colourslist[n], shrink=0.05, width=0.05, headwidth=0.4), color=colourslist[n])
+                bottom.annotate((str(n+1))+". "+str(selex_round_res_list[numrounds].kmer_counter.hash2kmer(i)), (self.max_selex_round, (f/(1-f))), (self.max_selex_round+0.2, yposb[-(n+2)]), size=10, fontname='monospace', weight='bold', arrowprops=dict(color=colourslist[n], shrink=0.05, width=0.05, headwidth=0.4), color=colourslist[n])
+
+            bar.bar(xaxis, (totaldict.values()))
+
+            plt.savefig(self.out_dir + os.sep + self.trend_figure_dir + os.sep + pathname)
+
+        grapher()
 
     # generate html for kmer_len=k
     def gen_html_k(self, html_div_list, kmer_len, trend_fig_dir, trend_fig_name):
