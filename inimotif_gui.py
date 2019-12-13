@@ -137,11 +137,40 @@ class Application(Frame):
                 return False
         vcmd1 = (master.register(validate_identifier), '%P')
 
+        def identifiercolour(event):
+            identifier_entry.config({"background": "light green"})
+            #identifier_entry.config({"background": "tomoato"})
+
+        def infilecolour(event):
+            if os.path.exists(str(infile_entry.get())):
+                infile_entry.config({"background": "light green"})
+            else:
+                infile_entry.config({"background": "tomato"})
+
+        def outdircolour(event):
+            if os.access(str(outdir_entry.get()), os.W_OK):
+                outdir_entry.config({"background": "light green"})
+            else:
+                outdir_entry.config({"background": "tomato"})
+
+        def minkmercolour(event):
+            if int(min_kmer_len_entry.get()) >= 0:
+                min_kmer_len_entry.config({"background": "light green"})
+            else:
+                min_kmer_len_entry.config({"background": "tomato"})
+
+        def maxkmercolour(event):
+            if int(max_kmer_len_entry.get()) >= int(min_kmer_len_entry.get()):
+                max_kmer_len_entry.config({"background": "light green"})
+            else:
+                max_kmer_len_entry.config({"background": "tomato"})
+
         identifier_label = Label(master, text="Identifier")
         identifier_entry = Entry(master, validate="focusout", validatecommand=vcmd1)
         identifier_entry.insert(END, 'TF_name')
         identifier_label.grid(row=0, column=0)
         identifier_entry.grid(row=0, column=1)
+        identifier_entry.bind("<FocusOut>", identifiercolour)
 
         # def validate_inputfile(in_str):
         #     return os.path.exists(in_str)
@@ -156,6 +185,7 @@ class Application(Frame):
         infile_label.grid(row=irow, column=0)
         infile_entry.grid(row=irow, column=1)
         infile_button.grid(row=irow, column=2)
+        infile_entry.bind("<FocusOut>", infilecolour)
 
         irow = 2
         outdir_label = Label(master, text="Output Directory")
@@ -165,6 +195,7 @@ class Application(Frame):
         outdir_label.grid(row=irow, column=0)
         outdir_entry.grid(row=irow, column=1)
         outdir_button.grid(row=irow, column=2)
+        outdir_entry.bind("<FocusOut>", outdircolour)
 
         # def validate_kmer_len(in_str):
         #     val = int(in_str)
@@ -180,6 +211,7 @@ class Application(Frame):
         # min_kmer_len_entry = Entry(master, validate="key", validatecommand=vcmd4)
         min_kmer_len_label.grid(row=irow, column=0)
         min_kmer_len_entry.grid(row=irow, column=1)
+        min_kmer_len_entry.bind("<FocusOut>", minkmercolour)
 
         irow = 4
         max_kmer_len_label = Label(master, text="Maximum Kmer Length")
@@ -187,6 +219,8 @@ class Application(Frame):
         # max_kmer_len_entry = Entry(master,validate="key", validatecommand=vcmd4)
         max_kmer_len_label.grid(row=irow, column=0)
         max_kmer_len_entry.grid(row=irow, column=1)
+        max_kmer_len_entry.bind("<FocusOut>", maxkmercolour)
+
 
         irow = 6
         self.run_button = Button(master, text="Run", command=run_analysis)
@@ -258,11 +292,28 @@ class Application(Frame):
             }
             self.init_selexseq_gui_tabmain_step1(master)
 
+        def identifiercolour(event):
+            identifier_entry.config({"background": "light green"})
+            #identifier_entry.config({"background": "tomoato"})
+        def minroundcolour(event):
+            if int(min_round_entry.get()) >= 0:
+                min_round_entry.config({"background": "light green"})
+            else:
+                min_round_entry.config({"background": "tomato"})
+
+        def maxroundcolour(event):
+            if int(max_round_entry.get()) >= int(min_round_entry.get()):
+                max_round_entry.config({"background": "light green"})
+            else:
+                max_round_entry.config({"background": "tomato"})
+
+
         identifier_label = Label(master, text="Identifier")
         identifier_entry = Entry(master, validate="focusout", validatecommand=vcmd1)
         identifier_entry.insert(END, 'TF_name')
         identifier_label.grid(row=0, column=0)
         identifier_entry.grid(row=0, column=1)
+        identifier_entry.bind("<FocusOut>", identifiercolour)
 
         irow = 1
         min_round_label = Label(master, text="Minimum SELEX round number")
@@ -270,6 +321,7 @@ class Application(Frame):
         # min_round_entry = Entry(master, validate="key", validatecommand=vcmd4)
         min_round_label.grid(row=irow, column=0)
         min_round_entry.grid(row=irow, column=1)
+        min_round_entry.bind("<FocusOut>", minroundcolour)
 
         irow = 2
         max_round_label = Label(master, text="Maximum SELEX round numer")
@@ -277,6 +329,7 @@ class Application(Frame):
         # max_round_entry = Entry(master, validate="key", validatecommand=vcmd4)
         max_round_label.grid(row=irow, column=0)
         max_round_entry.grid(row=irow, column=1)
+        max_round_entry.bind("<FocusOut>", maxroundcolour)
 
         irow = 3
         next_button = Button(master, text="Next", command=call_next)
@@ -314,6 +367,12 @@ class Application(Frame):
 
         self.selex_gui_dict['next_button'].grid_forget()
 
+        def roundfilescolour(event, relround):
+            if os.path.exists(str(selex_infile_entry_arr[relround].get())):
+                selex_infile_entry_arr[relround].config({"background": "light green"})
+            else:
+                selex_infile_entry_arr[relround].config({"background": "tomato"})
+
         curr_row = self.selex_para_dict['curr_row']
         selex_infile_label_arr = []
         selex_infile_entry_arr = []
@@ -321,12 +380,14 @@ class Application(Frame):
         for i_row, i_round in enumerate(range(self.selex_para_dict["min_selex_round"],self.selex_para_dict["max_selex_round"]+1)):
             tmplabel = Label(master, text=f'Selex Round {i_round}')
             tmpentry = Entry(master)
+            #tmpentry.bind("<FocusOut>", lambda event : roundfilescolour(event, i_row))
             tmpbutton = Button(master, text="Open File", command=Command(enter_filename, i_row) )
             tmplabel.grid(row=curr_row+i_row, column=0)
             tmpentry.grid(row=curr_row+i_row, column=1)
             tmpbutton.grid(row=curr_row+i_row, column=2)
             selex_infile_label_arr.append(tmplabel)
             selex_infile_entry_arr.append(tmpentry)
+            selex_infile_entry_arr[i_row].bind("<FocusOut>", lambda event, relround=(i_row): roundfilescolour(event, relround))
             selex_infile_button_arr.append(tmpbutton)
 
         curr_row += i_row
@@ -350,7 +411,25 @@ class Application(Frame):
             outdir_entry.delete(0,END)
             outdir_entry.insert(0,outdir)
 
-        curr_row = self.selex_para_dict['curr_row']
+        curr_row = self.selex_para_dict['curr_row']+1
+
+        def outdircolour(event):
+            if os.access(str(outdir_entry.get()), os.W_OK):
+                outdir_entry.config({"background": "light green"})
+            else:
+                outdir_entry.config({"background": "tomato"})
+
+        def minkmercolour(event):
+            if int(min_kmer_len_entry.get()) >= 0:
+                min_kmer_len_entry.config({"background": "light green"})
+            else:
+                min_kmer_len_entry.config({"background": "tomato"})
+
+        def maxkmercolour(event):
+            if int(max_kmer_len_entry.get()) >= int(min_kmer_len_entry.get()):
+                max_kmer_len_entry.config({"background": "light green"})
+            else:
+                max_kmer_len_entry.config({"background": "tomato"})
 
         outdir_label = Label(master, text="Output Directory")
         outdir_entry = Entry(master)
@@ -359,18 +438,22 @@ class Application(Frame):
         outdir_label.grid(row=curr_row, column=0)
         outdir_entry.grid(row=curr_row, column=1)
         outdir_button.grid(row=curr_row, column=2)
+        outdir_entry.bind("<FocusOut>", outdircolour)
+
 
         irow = 1
         min_kmer_len_label = Label(master, text="Minimum Kmer Length")
         min_kmer_len_entry = Entry(master)
         min_kmer_len_label.grid(row=curr_row+irow, column=0)
         min_kmer_len_entry.grid(row=curr_row+irow, column=1)
+        min_kmer_len_entry.bind("<FocusOut>", minkmercolour)
 
         irow = 2
         max_kmer_len_label = Label(master, text="Maximum Kmer Length")
         max_kmer_len_entry = Entry(master)
         max_kmer_len_label.grid(row=curr_row+irow, column=0)
         max_kmer_len_entry.grid(row=curr_row+irow, column=1)
+        max_kmer_len_entry.bind("<FocusOut>", maxkmercolour)
 
         irow = 3
         self.run_button = Button(master, text="Run", command=run_analysis)
