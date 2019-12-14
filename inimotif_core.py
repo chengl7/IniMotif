@@ -22,7 +22,6 @@ from yattag import Doc,indent
 import warnings
 
 from adjustText import adjust_text
-import random
 
 from dna_logo import Logo
 

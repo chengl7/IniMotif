@@ -1,6 +1,6 @@
 import re
 
-from inimotif_core import KmerCounter, MotifManager
+from inimotif_core import KmerCounter
 
 # a pattern for matching DNA repeats
 class RepeatPattern:
