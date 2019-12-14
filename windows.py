@@ -287,13 +287,14 @@ def winset_intersect(winset1: WindowSet, winset2: WindowSet):
     return ret_winset, label_vec
 
 
-def gen_full_win_list(forward_motif_pos_arr, revcom_motif_pos_arr, kmer_len, seq_len):
+def gen_full_win_list(forward_motif_pos_arr, revcom_motif_pos_arr, kmer_len_forward, kmer_len_revcom, seq_len):
     """
     Split sequence into consecutive regions of different types
     Input
     forward_motif_pos_arr: start position of forward motif matching on sequence
     revcom_motif_pos_arr: start positio of revcom motif matching on sequence
-    kmer_len: length of kmer/motif
+    kmer_len_forward: length of forward kmer/motif
+    kmer_len_revcom: length of revcom kmer/motif
     seq_len: length of input sequence
     Output
     win_list: a list of consecutive regions, each element is a tuple in the form of (start pos, end pos)
@@ -306,9 +307,9 @@ def gen_full_win_list(forward_motif_pos_arr, revcom_motif_pos_arr, kmer_len, seq
     forward_winset = WindowSet()
     revcom_winset = WindowSet()
     for pos in forward_motif_pos_arr:
-        forward_winset.append(Window(pos, pos+kmer_len))
+        forward_winset.append(Window(pos, pos+kmer_len_forward))
     for pos in revcom_motif_pos_arr:
-        revcom_winset.append(Window(pos,pos+kmer_len))
+        revcom_winset.append(Window(pos,pos+kmer_len_revcom))
     reslist, reslabel = winset_intersect(forward_winset, revcom_winset)
 
     # print()
@@ -399,7 +400,7 @@ def gen_full_win_list(forward_motif_pos_arr, revcom_motif_pos_arr, kmer_len, seq
     kmer_len = 4
     seq_len = 50
 
-    win_list, win_type_list = gen_full_win_list(forward_motif_pos_arr, revcom_motif_pos_arr, kmer_len, seq_len)
+    win_list, win_type_list = gen_full_win_list(forward_motif_pos_arr, revcom_motif_pos_arr, kmer_len, kmer_len, seq_len)
 
 
 

@@ -517,7 +517,7 @@ class MotifManager:
 
         forward_pos_list = []
         revcom_pos_list = []
-        both_pos_list = []  # positions match both forward motif and revcom motif
+        # both_pos_list = []  # positions match both forward motif and revcom motif
         i=0
         prev_hash = self.kmer_counter.dtype(-1)
         while(i<=len_str-k):
@@ -534,16 +534,16 @@ class MotifManager:
                 tmphash = (prev_hash<< self.kmer_counter.dtype(2) ) & self.kmer_counter.mask
                 tmphash += self.kmer_counter.base[ in_str[i+k-1] ]
             prev_hash = tmphash
-            tmpflag1, tmpflag2 = False, False
+            # tmpflag1, tmpflag2 = False, False
             if tmphash in self.forward_motif_ball:
                 forward_pos_list.append(i)
-                tmpflag1 = True
+                # tmpflag1 = True
             if not self.is_palindrome and self.revcom_flag:
                 if tmphash in self.revcom_motif_ball:
                     revcom_pos_list.append(i)
-                    tmpflag2 = True
-            if tmpflag1 and tmpflag2:
-                both_pos_list.append(i)
+                    # tmpflag2 = True
+            # if tmpflag1 and tmpflag2:
+            #     both_pos_list.append(i)
             i += 1
         return forward_pos_list,revcom_pos_list
 
@@ -606,7 +606,7 @@ class MotifManager:
                     fw_pos_list,rc_pos_list = self.motif_match(tmpseq)
                     if not fw_pos_list and not rc_pos_list:
                         continue
-                    win_list,win_type_list = gen_full_win_list(fw_pos_list, rc_pos_list, self.kmer_counter.k, len(tmpseq))
+                    win_list,win_type_list = gen_full_win_list(fw_pos_list, rc_pos_list, self.kmer_counter.k, self.kmer_counter.k, len(tmpseq))
 
                     with tag('p'):
                         # output header
@@ -775,23 +775,6 @@ class MotifManager:
         # plt.close()
         #plt.ioff()
         #plt.show()
-
-
-# TODO: motif location on sequence
-        # number of motif on sequence, done
-
-        # using bubble plot to display the joint number of motifs, done
-
-        # forward-forward co-occurence index, done
-        # forward-revcom co-occurence index, done
-
-        # mutation=2 is too large for small kmers, done
-
-        # output top kmer information, done
-        # output count of a given kmer information, done
-
-        # distance between motif on sequences, etc, DONE
-        # output sequences that contain motif and highlight the motifs, DONE
 
 # from Bio.Seq import Seq
 # def upper_file(file_name, file_type="fasta"):
