@@ -13,6 +13,9 @@ class RepeatPattern:
     def __init__(self, seq, n_min_rep, revcom_flag=True, n_max_rep=None):
         self.revcom_flag = revcom_flag
         
+        seq = seq.upper()
+        n_min_rep = int(n_min_rep)
+        
         if n_max_rep is None:
             n_max_rep = ''
         self.forward_pattern = re.compile(f'({seq}){{{n_min_rep},{n_max_rep}}}')
@@ -33,6 +36,9 @@ class RepeatPattern:
 class Motif:
     def __init__(self, seq, n_max_mutation=0, revcom_flag=True):
         assert n_max_mutation<len(seq), f'n_max_mutation={n_max_mutation} is smaller than seq length {len(seq)}!'
+        seq = seq.upper()
+        n_max_mutation = int(n_max_mutation)
+        
         kc = KmerCounter(len(seq))
         self.kc = kc
         self.revcom_flag = revcom_flag
