@@ -12,11 +12,13 @@ from tkinter import StringVar, IntVar, BooleanVar
 from tkinter.ttk import Button, Label, Entry, Frame, Notebook, Progressbar, Style, Combobox, Radiobutton, Checkbutton
 import os
 from inimotif_main import FileProcessor,ChipSeqProcessor,SelexSeqProcessor
-from inimotif_util import Masker
+from inimotif_util import Masker, MotifScanner
 #from tkinter import *
 
-import time
+# import time
 import threading
+import pickle
+import sys
 
 class Command:
     def __init__(self, callback, *args, **kwargs):
@@ -87,6 +89,29 @@ def gen_mask_pattern(master, label_text, type_value, revcom_value):
     # entry2.insert(END, entry2_text)
     return label, combobox, check, entry1, entry2
 
+def gen_motif_row(master, label_text, revcom_value):
+    # type_value: StringVar, type of pattern, 'Repeat' or 'Motif'
+    # revcom_value: IntVar, if revcom of pattern should be used
+    label = Label(master, text=label_text)
+    check = Checkbutton(master, text='', variable=revcom_value, onvalue=1, offvalue=0)
+    
+    entry1 = Entry(master, style='grey.TEntry')
+    # entry1.insert(END, entry1_text)
+    
+    entry2 = Entry(master, style='grey.TEntry')
+    # entry2.insert(END, entry2_text)
+    return label, check, entry1, entry2
+
+class IORedirector(object):
+    '''A general class for redirecting I/O to this Text widget.'''
+    def __init__(self,text_area):
+        self.text_area = text_area
+
+class StdoutRedirector(IORedirector):
+    '''A class for redirecting stdout to this Text widget.'''
+    def write(self,str):
+        self.text_area.write(str,False)
+
 class Application(Frame):
     def __init__(self, master=None):
         super().__init__(master, borderwidth=5, width=0.8*screen_width, height=0.7*screen_height)
@@ -112,6 +137,7 @@ class Application(Frame):
         self.chip_para_dict = {}
         self.selex_para_dict = {}
         self.mask_para = []
+        self.motif_scan_para = []
 
         self.selex_gui_dict = {}
         
@@ -241,8 +267,7 @@ class Application(Frame):
         # for cmd in callback_fun_arr:
         #     print(cmd.args)
         add_entry_button = Button(self, text="Add Pattern", command=callback_fun_arr[func_ind_gen.get()])
-        add_entry_button.grid(row=irow, column=5)
-        add_entry_button.grid(row=irow, column=5)
+        add_entry_button.grid(row=irow, column=5, sticky='w')
 
         self.progress_row = row_gen.get()
         irow = row_gen.get()
@@ -293,15 +318,147 @@ class Application(Frame):
         main = Frame(note)
         win_extract = Frame(note)
         note.add(main, text = "Chip-Seq Main")
-        note.add(win_extract, text = "Chip-Seq Window Extract")
+        note.add(win_extract, text = "Motif Scan")
 
         self.init_chipseq_gui_tabmain(main)
+        self.init_motifscan_guitab(win_extract)
 
         # note.grid_rowconfigure(0, weight=1)
         note.grid_columnconfigure(0, weight=1)
         # note.grid(row=0,column=0, sticky=N, pady=(250, 10))
         note.grid(row=row_gen.get(),column=0)
 
+    def init_kmerquery_guitab(self, master):
+        def enter_filename():
+            file = filedialog.askopenfilename(initialdir='.',title = "Open file", filetypes = (("preprocessed file",".pickle"),("all files","*.*")))
+            input_file_entry.delete(0,END)
+            input_file_entry.insert(0,file)
+        input_file_label = Label(master, text='Preprocessed File')
+        input_file_entry = Entry(master, style='grey.TEntry')
+        
+        fp = None  # a FileProcessor instance
+        def load_preproc_file():
+            fp  = pickle.load( input_file_entry.get() )
+            # do something after loading
+        
+        def init_textarea():
+            pass
+        
+        load_btn = Button(master, text="Load Data", command=load_preproc_file)
+        
+        kmer_label = Label(master, text="Kmer")
+        kmer_entry = Entry(master, style='grey.TEntry')
+        
+        pass
+    
+    def run_scan(self):
+        def run_scan_task(*args):
+            scanner = args[0]
+            infile = args[1]
+            outfile = args[2]
+            self.progress.grid(row=self.progress_row ,column=0, columnspan=3, pady=30)
+            self.progress.start()
+            scanner.scan_file(infile, outfile)
+            self.progress.stop()
+            self.progress.grid_forget()
+
+            messagebox.showinfo('Info', "Process completed!")
+            self.run_button['state']='normal'
+
+        self.run_button['state']='disabled'
+
+        threading.Thread(target=run_scan_task, args=self.motif_scan_para).start()
+    
+    def init_motifscan_guitab(self, master):
+        row_gen = NumGenerator()
+        
+        irow = row_gen.get()
+        infile_label, infile_entry, infile_button = gen_file_entry(master, 'Input file', './inputfile.fasta', 'Open File')
+        infile_label.grid(row = irow, column=0, columnspan=1, sticky='w')
+        infile_entry.grid(row = irow, column=1, columnspan=1, sticky='w')
+        infile_button.grid(row = irow, column=2, columnspan=1, sticky='w')
+        
+        irow = row_gen.get()
+        outfile_label, outfile_entry, outfile_button = gen_file_entry(master, 'Output file', './output_file.html', 'Open File')
+        outfile_label.grid(row = irow, column=0, columnspan=1, sticky='w')
+        outfile_entry.grid(row = irow, column=1, columnspan=1, sticky='w')
+        outfile_button.grid(row = irow, column=2, columnspan=1, sticky='w')
+        
+        irow = row_gen.get()
+        text_list = ['Motif', 'Include\nRevCom', 'Consensus Sequence', 'n_max_mutation']
+        for i,text in enumerate(text_list):
+            tmplabel = Label(master, text=text)
+            tmplabel.grid(row=irow, column=i, pady=20, sticky='w')
+        
+        def add_pattern(master, label_text, revcom_value, irow, seq_entry_arr, num_entry_arr):
+            # allow no more than 2 motifs
+            if len(seq_entry_arr)>=2:
+                return
+            # label, checkbox, entry1, entry2
+            widget_list = gen_motif_row(master, label_text, revcom_value)
+            for i,w in enumerate(widget_list):
+                w.grid(row=irow, column=i, sticky='w')
+            
+            revcom_checkbox, seq_entry, num_entry = widget_list[1:]
+                
+            revcom_checkbox.invoke()
+            seq_entry_arr.append(seq_entry)
+            num_entry_arr.append(num_entry)
+            
+            shift_buttons(irow)
+            
+        def shift_buttons(irow):
+            self.progress_row += 1
+            add_entry_button.grid_forget()
+            add_entry_button['command']=callback_fun_arr[func_ind_gen.get()]
+            add_entry_button.grid(row=irow, column=5, sticky='w')
+            self.run_button.grid_forget()
+            self.run_button.grid(row=irow+2, column=2, pady=50, sticky='w')
+            quit_button.grid_forget()
+            quit_button.grid(row=irow+2, column=4, pady=50, sticky='w')
+        
+        def run_analysis():
+            self.motif_scan_para = []
+            
+            n_input_pat = len(seq_entry_arr)
+            
+            scanner = MotifScanner()
+            for i in range(n_input_pat):
+                seq = seq_entry_arr[i].get()
+                num = int(num_entry_arr[i].get())
+                revcom_flag = revcom_arr[i].get()
+                scanner.add_motif(seq, num, revcom_flag)
+            
+            infile = infile_entry.get()
+            outfile = outfile_entry.get()
+            
+            self.motif_scan_para.append(scanner)
+            self.motif_scan_para.append(infile)
+            self.motif_scan_para.append(outfile)
+            
+            self.run_scan()
+            
+        n_max_pat = 10
+        revcom_arr = [BooleanVar() for _ in range(n_max_pat)]
+        seq_entry_arr = []
+        num_entry_arr = []
+        func_ind_gen = NumGenerator()
+        callback_fun_arr = [Command(add_pattern, master, f'Motif {i+1}', revcom_arr[i], irow+i+1, seq_entry_arr, num_entry_arr)
+                            for i in range(n_max_pat) ]
+        # for cmd in callback_fun_arr:
+        #     print(cmd.args)
+        add_entry_button = Button(master, text="Add Motif", command=callback_fun_arr[func_ind_gen.get()])
+        add_entry_button.grid(row=irow, column=4, sticky='w')
+
+        self.progress_row = row_gen.get()
+        irow = row_gen.get()
+        self.run_button = Button(master, text="RUN", command=run_analysis)
+        self.run_button.grid(row=irow, column=0, pady=50, sticky='w')
+        
+        quit_button = Button(master, text="QUIT", command=self.master.destroy)
+        quit_button.grid(row=irow, column=3, pady=50, sticky='w')
+
+        self.progress = Progressbar(master, orient=HORIZONTAL, length=300,  mode='indeterminate')
 
     def init_chipseq_gui_tabmain(self,master):
 

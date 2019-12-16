@@ -88,10 +88,11 @@ class Motif:
             forward_flag = tmphash in self.forward_hamball
             revcom_flag = self.revcom_flag and (tmphash in self.revcom_hamball)
             if forward_flag or revcom_flag:
+                # prev_hash = self.kc.dtype(-1)
                 for ii in range(i,i+k):
                     in_str_list[ii] = 'N' 
-                i += k
-                continue
+                # i += k
+                # continue
             i += 1
         return "".join(in_str_list)
     
@@ -120,9 +121,10 @@ class Motif:
             forward_flag = tmphash in self.forward_hamball
             revcom_flag = self.revcom_flag and (tmphash in self.revcom_hamball)
             if forward_flag or revcom_flag:
+                # prev_hash = self.kc.dtype(-1)
                 pos_list.append(i)
-                i += k
-                continue
+                # i += k
+                # continue
             i += 1
         return pos_list
 
@@ -273,29 +275,35 @@ class MotifScanner:
 
     
 if __name__=="__main__":
-    in_str = 'AAAAAAAAAAACGTGCCCCCGTGGGGGCGTGAAAACACGCCCCCACGTTTTCACGTTTTCACG'
-    mask = Masker()
-    mask.add_reppat('A',4,True)
-    mask.add_reppat('C',4,True)
-    mask.add_motif('CGTG',1,False)
-    # mask.add_motif_pat('CGTG',1,True)
+    # in_str = 'AAAAAAAAAAACGTGCCCCCGTGGGGGCGTGAAAACACGCCCCCACGTTTTCACGTTTTCACG'
+    # mask = Masker()
+    # mask.add_reppat('A',4,True)
+    # mask.add_reppat('C',4,True)
+    # mask.add_motif('CGTG',1,False)
+    # # mask.add_motif_pat('CGTG',1,True)
     
-    # out_str = mask.mask(in_str)
-    # print(in_str)
-    # print(out_str)
+    # # out_str = mask.mask(in_str)
+    # # print(in_str)
+    # # print(out_str)
     
-    infile = './exampledata/NF1-1'
-    outfile = './test_mask.fasta'
-    mask.mask_file(infile, outfile)
+    # infile = './exampledata/NF1-1'
+    # outfile = './test_mask.fasta'
+    # mask.mask_file(infile, outfile)
     
-    ms = MotifScanner()
-    ms.add_motif('CGTG',1,True)
-    ms.add_motif('AAAA',1,False)
-    # print([(i,c) for i,c in enumerate(in_str)])
-    # print(ms.scan(in_str))
+    # ms = MotifScanner()
+    # ms.add_motif('CGTG',1,True)
+    # ms.add_motif('AAAA',1,False)
+    # # print([(i,c) for i,c in enumerate(in_str)])
+    # # print(ms.scan(in_str))
     
-    nfile = './exampledata/NF1-1'
-    out_file = './test_motif_scan.html'
-    ms.scan_file(infile, out_file)
+    # nfile = './exampledata/NF1-1.fa'
+    # out_file = './test_motif_scan.html'
+    # ms.scan_file(infile, out_file)
     
+    # in_str = 'TCTATCCTAAGTGAAAACTGAATATATATTAGA'
+    # motif = Motif('AAAA', 0)
+    # for i,c in enumerate(in_str):
+    #     print(i,c)
+    # print(motif.scan(in_str))
+    pass
     
