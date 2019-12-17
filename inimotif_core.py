@@ -263,7 +263,7 @@ class KmerCounter:
             tmpbase = self.dtype((~tmpmask) & self.mask & kmer_hash)
 
             def my_gen(m):
-                return [i for i in range(4) if i!=m]
+                return [self.dtype(i) for i in range(4) if i!=m]
 
             for e in product(*[my_gen(b) for b in base_list]):
                 tmphash = tmpbase
@@ -344,9 +344,12 @@ class KmerCounter:
         for m in range(len(self.top_kmers_list)):
             tmp_kmer_list = self.top_kmers_list[m]
             for i,kh in enumerate(tmp_kmer_list):
-                tmpind = np.where(all_kh_arr==kh)[0][0]
+                tmpres = np.where(all_kh_arr==kh)[0]
+                if len(tmpres)==0:
+                    continue
+                tmpind = tmpres[0]
                 plt.scatter(hamdis_arr[tmpind], all_cnt_arr[tmpind], label=self.hash2kmer(kh), color=labelcolours[i], s=3)
-                texts.append(plt.text(hamdis_arr[tmpind], all_cnt_arr[tmpind]-0.3, f'{self.hash2kmer(kh)} {self.kmer_dict[kh]}', color=labelcolours[i], fontsize=5))
+                texts.append(plt.text(hamdis_arr[tmpind], all_cnt_arr[tmpind]-0.3, f'{self.hash2kmer(kh)} {self.kmer_dict.get(kh,0)}', color=labelcolours[i], fontsize=5))
 
         # adjust text
         adjust_text(texts, lw=0.5)
@@ -398,12 +401,12 @@ class KmerCounter:
                 info_str_arr.append(f'Total count is {self.get_pair_cnt(khash)}. This is a Palindrome.')
             elif self.revcom_flag:
                 info_str_arr.append( f'Total count is {self.get_pair_cnt(khash)}' )
-            info_str_arr.append(f'{kmer} {self.kmer_dict[khash]}')
+            info_str_arr.append(f'{kmer} {self.kmer_dict.get(khash,0)}')
 
             if self.revcom_flag:
                 rc_kmer = self.revcom(kmer)
                 rc_khash = self.kmer2hash(rc_kmer)
-                info_str_arr.append(f'{rc_kmer} {self.kmer_dict[rc_khash]}')
+                info_str_arr.append(f'{rc_kmer} {self.kmer_dict.get(rc_khash,0)}')
 
             info_str_arr.append('')
 
@@ -745,7 +748,10 @@ class MotifManager:
             x_kde = np.linspace(0,len(x),1000)
             std = 5
             density = sum(xi*norm.pdf(x_kde, mu, std) for mu,xi in enumerate(x))
-            return density/sum(density)
+            t_sum = sum(density)
+            if t_sum==0:
+                t_sum = 1
+            return density/t_sum
 
         # kernel smoothing
         y_sum_forward = sum(self.tfbs_pos_dis_forward)

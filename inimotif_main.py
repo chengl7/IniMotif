@@ -342,7 +342,7 @@ class SelexSeqProcessor:
         n_disp_sample = 800  # number of kmers to be displayed
         if n_disp_sample<len(all_kh_arr):
             tmparr = np.random.choice(all_kh_arr,n_disp_sample)
-            sub_kh_arr += tmparr.tolist()
+            sub_kh_arr += [kh for kh in tmparr]  # tolist change element type to int
         else:
             sub_kh_arr += all_kh_arr
         
@@ -536,5 +536,5 @@ if __name__=="__main__":
     file_list = ['NF1-1','NF1-2','NF1-3','NF1-4']
     file_name_arr = [in_dir+f for f in file_list]
     out_dir='./test'
-    ssp = SelexSeqProcessor(file_name_arr=file_name_arr,identifier='NF',min_kmer_len=6, max_kmer_len=7,min_selex_round=1,max_selex_round=4,out_dir=out_dir)
+    ssp = SelexSeqProcessor(file_name_arr=file_name_arr,identifier='NF',min_kmer_len=18, max_kmer_len=20,min_selex_round=1,max_selex_round=4,out_dir=out_dir)
     ssp.run()
