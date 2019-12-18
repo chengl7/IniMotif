@@ -670,14 +670,14 @@ class Application(Frame):
         row_gen = NumGenerator()
         
         irow = row_gen.get()
-        identifier_label, identifier_entry = gen_label_entry(master, "Identifier", "TF_name")
+        identifier_label, identifier_entry = gen_label_entry(master, "Identifier", "TF_name", grid_on=True, irow=irow)
         # identifier_label = Label(master, text="Identifier")
         # identifier_entry = Entry(master, validate="focusout", validatecommand=vcmd1)
         # identifier_entry.insert(END, 'TF_name')
         # identifier_entry['validate']="focusout"
         # identifier_entry['validatecommand']=vcmd1
-        identifier_label.grid(row=irow, column=0)
-        identifier_entry.grid(row=irow, column=1)
+        # identifier_label.grid(row=irow, column=0)
+        # identifier_entry.grid(row=irow, column=1)
         # identifier_entry.bind("<FocusOut>", identifiercolour)
 
         # def validate_inputfile(in_str):
@@ -685,16 +685,17 @@ class Application(Frame):
         # vcmd2 = (master.register(validate_inputfile), '%P')
 
         irow = row_gen.get()
-        infile_label, infile_entry, infile_button = gen_file_entry(master, "Input file", 'path_to_input_fasta_file', 'Open File' )
+        infile_label, infile_entry, infile_button = gen_file_entry(master, "Input file", 'path_to_input_fasta_file', 'Open File', 
+                                                                   grid_on=True, irow=irow )
         
         # infile_label = Label(master, text="Input file")
         # infile_entry = Entry(master)
         # # infile_entry = Entry(master, validate="focusout", validatecommand=vcmd2)
         # infile_entry.insert(END, 'path_to_input_fasta_file')
         # infile_button = Button(master, text="Open File", command=enter_filename)
-        infile_label.grid(row=irow, column=0)
-        infile_entry.grid(row=irow, column=1)
-        infile_button.grid(row=irow, column=2)
+        # infile_label.grid(row=irow, column=0)
+        # infile_entry.grid(row=irow, column=1)
+        # infile_button.grid(row=irow, column=2)
         # infile_entry.bind("<FocusOut>", infilecolour)
 
         # irow = row_gen.get()
@@ -703,10 +704,12 @@ class Application(Frame):
         # # outdir_entry.insert(END, 'path_to_output_directory')
         # outdir_button = Button(master, text="Open Directory", command=enter_outdir)
         
-        outdir_label, outdir_entry, outdir_button = gen_directory_entry(master, "Output Directory", "", "Open Directory")
-        outdir_label.grid(row=irow, column=0)
-        outdir_entry.grid(row=irow, column=1)
-        outdir_button.grid(row=irow, column=2)
+        irow = row_gen.get()
+        outdir_label, outdir_entry, outdir_button = gen_directory_entry(master, "Output Directory", "", "Open Directory",
+                                                                        grid_on=True, irow=irow)
+        # outdir_label.grid(row=irow, column=0)
+        # outdir_entry.grid(row=irow, column=1)
+        # outdir_button.grid(row=irow, column=2)
         # outdir_entry.bind("<FocusOut>", outdircolour)
 
         # def validate_kmer_len(in_str):
@@ -718,21 +721,21 @@ class Application(Frame):
         # vcmd4 = (master.register(validate_kmer_len), '%P')
 
         irow = row_gen.get()
-        min_kmer_len_label, min_kmer_len_entry = gen_label_entry(master, "Minimum Kmer Length", "")
+        min_kmer_len_label, min_kmer_len_entry = gen_label_entry(master, "Minimum Kmer Length", "", grid_on=True, irow=irow)
         # min_kmer_len_label = Label(master, text="Minimum Kmer Length")
         # min_kmer_len_entry = Entry(master)
         # min_kmer_len_entry = Entry(master, validate="key", validatecommand=vcmd4)
-        min_kmer_len_label.grid(row=irow, column=0)
-        min_kmer_len_entry.grid(row=irow, column=1)
+        # min_kmer_len_label.grid(row=irow, column=0)
+        # min_kmer_len_entry.grid(row=irow, column=1)
         # min_kmer_len_entry.bind("<FocusOut>", minkmercolour)
 
         irow = row_gen.get()
-        max_kmer_len_label, max_kmer_len_entry = gen_label_entry(master, "Maximum Kmer Length", "")
+        max_kmer_len_label, max_kmer_len_entry = gen_label_entry(master, "Maximum Kmer Length", "", grid_on=True, irow=irow)
         # max_kmer_len_label = Label(master, text="Maximum Kmer Length")
         # max_kmer_len_entry = Entry(master)
         # max_kmer_len_entry = Entry(master,validate="key", validatecommand=vcmd4)
-        max_kmer_len_label.grid(row=irow, column=0)
-        max_kmer_len_entry.grid(row=irow, column=1)
+        # max_kmer_len_label.grid(row=irow, column=0)
+        # max_kmer_len_entry.grid(row=irow, column=1)
         # max_kmer_len_entry.bind("<FocusOut>", maxkmercolour)
 
         self.progress_row = row_gen.get()
