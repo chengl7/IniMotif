@@ -36,4 +36,4 @@ So to run chipWinExtract.py for this data:
 ```
 python chipWinExtract.py -t chipseqwindows/VR_HB13_hg19.tsv -r chromosomes -o chipseqwindows -i 1 -s 2 -e 3 --concat-fasta
 ```
-this will create a fasta file for each chromosome and a final concatenated fasta which contains all the chromosomes in the chipseqwindows directory.
+this will create a fasta file for each chromosome and a final concatenated fasta which contains all the chromosomes, the fastas will be saved to the output directory (in this case chipseqwindows).
