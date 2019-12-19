@@ -50,32 +50,32 @@ A report file including information on the downloaded data will be generated if 
 ## **Examples of using the accession ID to download**
 E.g. to download the fastq associated with the run SRR5188398:
 ```
-python enaFastqFetch.py -s SRR5188398 -d run
+enaFastqFetch.py -s SRR5188398 -d run
 ```
 E.g. to download all of the fastqs associated with the study PRJNA360902:
 ```
-python enaFastqFetch.py -s PRJNA360902 -d study
+enaFastqFetch.py -s PRJNA360902 -d study
 ```
 E.g. to download all of the fastqs associated with the experiment SRX2504319:
 ```
-python enaFastqFetch.py -s SRX2504319 -d experiment
+enaFastqFetch.py -s SRX2504319 -d experiment
 ```
 E.g. to download all of the fastqs associated with the sample SAMN06240265:
 ```
-python enaFastqFetch.py -s SAMN06240265 -d sample
+enaFastqFetch.py -s SAMN06240265 -d sample
 ```
 
 ## **Examples of using the taxon ID to download**
 E.g. to download all the runs found for the taxon 47839:
 ```
-python enaFastqFetch.py -s 47839 -d run
+enaFastqFetch.py -s 47839 -d run
 ```
  E.g. to download 10 runs for the taxon 1773 and generate a report file:
 ```
-python enaFastqFetch.py -s 1773 -d run -n 10 --report-file
+enaFastqFetch.py -s 1773 -d run -n 10 --report-file
 ```
 ## **Examples of using free text search to download**
 E.g. to download 5 selex studies:
 ```
-python enaFastqFetch.py -s "SELEX" -d study -n 5
+enaFastqFetch.py -s "SELEX" -d study -n 5
 ```
