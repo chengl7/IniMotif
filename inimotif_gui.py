@@ -160,8 +160,11 @@ class Application(Frame):
         self.proc = None
         
         self.main_widgets = []
-        self.logoimage = PhotoImage(file=sys.prefix+"/GUIgraphics/logo.png")
-        self.maskerimage = PhotoImage(file=sys.prefix+"/GUIgraphics/masker.png")
+        
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        sep = os.sep
+        self.logoimage = PhotoImage(file=f'{script_dir}{sep}GUIgraphics{sep}logo.png')
+        self.maskerimage = PhotoImage(file=f'{script_dir}{sep}GUIgraphics{sep}masker.png')
 
         self.run_func = None
         self.run_button = None
