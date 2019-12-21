@@ -1,0 +1,8 @@
+Numpy
+scipy
+matplotlib
+biopython
+yattag
+adjustText
+seaborn
+requests
