@@ -3,10 +3,18 @@
 ## Installation
 The recommended way to setup your computer for running **Inimotif** is to install the official distribution of Python 3.7. You can download the official Python 3.7 distribution [here](https://www.python.org/downloads/release/python-375). 
 
-Once you've installed Python, download the zip file of **IniMotif** from this repository (click **Clone or download** on top right corner). Decompress this zip file and open the terminal/prompt and change to this directory. Enter the following command:
+Once you've installed Python, download the zip file of **IniMotif** from this repository (click **Clone or download** on top right corner). Decompress this zip file and open the terminal/prompt and change to this directory. 
+
+In Linux and Mac, enter the following command:
 
 ```bash
 pip install -r requirements.txt
+```
+
+In Windows, enter the following command:
+
+```bash
+py -m pip install -r requirements.txt
 ```
 
 This will install the required python packages that Inimotif needs to run. Note that Inimotif may work for versions of Python 3 prior to 3.7, but this is untested. For Mac you may need to update Tcl/Tk to use the GUI for versions of Python prior to 3.7.2. See [here](https://www.python.org/download/mac/tcltk/) for more information.
@@ -22,8 +30,16 @@ conda activate inimotif
 ## Run IniMotif
 Open the GUI by opening the directory containing the python files in a terminal, and run the inimotif_gui.py using python.
 
+In Linux and Mac, enter the following command to run inimotif
+
 ```bash
 $ python inimotif_gui.py
+```
+
+In Windows, enter the following command to run inimotif
+
+```bash
+$ py inimotif_gui.py
 ```
 
 This will start the GUI of **IniMotif**. Select from one of the three options: ChP-seq, SELEX-seq, or Masker. Check the following tutorials for detailed function explanations.
